@@ -11,7 +11,9 @@ type Entry<T> = { data: T; timer?: ReturnType<typeof setTimeout> };
  * failed saves are retried until they succeed, and anything pending is flushed when the
  * tab is hidden or closed. The browser warns before leaving while changes are unsaved.
  */
-export function useSaver<T>(url: string, delay = 600) {
+export function useSaver<T>(url: string, delay = 600, onSaved?: (key: string, response: unknown) => void) {
+  const onSavedRef = useRef(onSaved);
+  onSavedRef.current = onSaved;
   const [statuses, setStatuses] = useState<Record<string, SaveStatus>>({});
   const pending = useRef(new Map<string, Entry<T>>());
   const inflight = useRef(new Set<string>());
@@ -43,6 +45,7 @@ export function useSaver<T>(url: string, delay = 600) {
           return;
         }
         if (!res.ok) throw new Error(String(res.status));
+        if (onSavedRef.current) onSavedRef.current(key, await res.json().catch(() => null));
         setStatus(key, pending.current.has(key) ? "saving" : "saved");
       } catch {
         if (!pending.current.has(key)) {

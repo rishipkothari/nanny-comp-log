@@ -1,7 +1,7 @@
 const DAY = 86400000;
 
-export type Settings = { otRate: number; otThreshold: number };
-export const DEFAULT_SETTINGS: Settings = { otRate: 28, otThreshold: 40 };
+export type Settings = { otRate: number; otThreshold: number; venmoHandle: string };
+export const DEFAULT_SETTINGS: Settings = { otRate: 28, otThreshold: 40, venmoHandle: "anat-sweeney" };
 
 function parse(s: string): number {
   const [y, m, d] = s.split("-").map(Number);
@@ -60,10 +60,13 @@ export type PaymentRow = {
   personal_date: string | null;
   route: string | null;
   notes: string | null;
+  approved: boolean;
+  /** ISO timestamp (UTC) of the last time the approval checkbox changed; null for imported history. */
+  approved_at: string | null;
 };
 
 export const hasPaymentData = (p: PaymentRow) =>
-  [p.homepay_earnings, p.homepay_net, p.homepay_date, p.personal_paid, p.personal_date, p.route, p.notes].some((v) => v !== null && v !== "");
+  p.approved || [p.homepay_earnings, p.homepay_net, p.homepay_date, p.personal_paid, p.personal_date, p.route, p.notes].some((v) => v !== null && v !== "");
 
 export type Period = {
   id: string;
@@ -82,6 +85,7 @@ export type Period = {
   homepayNet: number;
   personalPaid: number;
   totalPaid: number;
+  approved: boolean;
 };
 
 const hoursOf = (h: number, m: number) => h + m / 60;
@@ -105,7 +109,7 @@ export function buildPeriods(days: DayRow[], payments: PaymentRow[], settings: S
         worked: 0, vacation: 0, sick: 0, holiday: 0, stipend: 0, expenses: 0,
         total: 0, ot: 0, personalDue: 0,
         payment: payMap.get(start) ?? null,
-        homepayNet: 0, personalPaid: 0, totalPaid: 0,
+        homepayNet: 0, personalPaid: 0, totalPaid: 0, approved: false,
       };
       byStart.set(start, p);
     }
@@ -131,11 +135,36 @@ export function buildPeriods(days: DayRow[], payments: PaymentRow[], settings: S
     p.homepayNet = p.payment?.homepay_net ?? 0;
     p.personalPaid = p.payment?.personal_paid ?? 0;
     p.totalPaid = p.homepayNet + p.personalPaid;
+    p.approved = p.payment?.approved ?? false;
   }
   return out
     .filter((p) => p.total > 0 || p.stipend > 0 || p.expenses > 0 || p.payment)
     .sort((a, b) => (a.start < b.start ? 1 : -1));
 }
+
+/* ---------- settlement status ---------- */
+
+export type StatusKind = "open" | "awaiting" | "owed" | "settled";
+export type PeriodStatus = { kind: StatusKind; label: string; outstanding: number };
+
+/**
+ * One definition of "settled" for the whole app: the period has ended, payment is approved,
+ * and personal pay due equals personal pay made.
+ */
+export function periodStatus(
+  p: { end: string; personalDue: number; personalPaid: number; approved: boolean },
+  today: string,
+): PeriodStatus {
+  const outstanding = p.personalDue - p.personalPaid;
+  if (p.end >= today) return { kind: "open", label: "open", outstanding };
+  if (!p.approved) return { kind: "awaiting", label: "needs approval", outstanding };
+  if (outstanding >= 0.005) return { kind: "owed", label: `${money(outstanding)} owed`, outstanding };
+  // Paying more than was due leaves nothing owed, so it settles; the label keeps the difference visible.
+  if (outstanding <= -0.005) return { kind: "settled", label: `settled · ${money(-outstanding)} over`, outstanding };
+  return { kind: "settled", label: "settled", outstanding };
+}
+
+export const needsAttention = (s: PeriodStatus) => s.kind === "awaiting" || s.kind === "owed";
 
 /* ---------- grouping for the summary tables ---------- */
 
@@ -221,6 +250,19 @@ export function fmtDate(s: string | null | undefined): string {
   if (!s) return "";
   const [y, m, d] = s.split("-");
   return `${Number(m)}/${Number(d)}/${y}`;
+}
+
+/** "10/24/2026 3:12 PM" in Eastern time, from an ISO timestamp. */
+export function fmtDateTime(iso: string | null | undefined): string {
+  if (!iso) return "";
+  return new Date(iso).toLocaleString("en-US", {
+    timeZone: "America/New_York", month: "numeric", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit",
+  }).replace(",", "");
+}
+
+/** "9:30 AM" in Eastern time, from an ISO timestamp. */
+export function fmtTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" });
 }
 
 export function fmtDow(s: string): string {

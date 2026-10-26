@@ -1,12 +1,14 @@
 import Link from "next/link";
+import CalendarSettings from "@/components/CalendarSettings";
 import SettingsForm from "@/components/SettingsForm";
+import { listCalendars } from "@/lib/calendar";
 import { getSettings } from "@/lib/db";
 import { isAdmin } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
-  const [settings, admin] = await Promise.all([getSettings(), isAdmin()]);
+  const [settings, calendars, admin] = await Promise.all([getSettings(), listCalendars(), isAdmin()]);
   return (
     <>
       <h1>Settings</h1>
@@ -18,6 +20,7 @@ export default async function SettingsPage() {
         </p>
       )}
       <SettingsForm key={String(admin)} initial={settings} editable={admin} />
+      <CalendarSettings calendars={calendars} editable={admin} />
     </>
   );
 }
