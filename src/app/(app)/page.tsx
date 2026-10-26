@@ -2,9 +2,11 @@ import Link from "next/link";
 import { after } from "next/server";
 import PaymentCard from "@/components/PaymentCard";
 import PeriodSummary from "@/components/PeriodSummary";
+import ScheduleDay from "@/components/ScheduleDay";
 import { addDays, buildPeriods, fmtDate, fmtDow, fmtLocalTime, holidayHours, hrs, sickHours, totalHours, vacationHours, workedHours, money, needsAttention, periodStart, periodStatus, todayET, type DayRow, type Period, type PeriodStatus } from "@/lib/calc";
 import { getEventsOn, hasUnsyncedCalendar, listCalendars, syncAll, type DayEvent } from "@/lib/calendar";
 import { getDays, getPayments, getSettings } from "@/lib/db";
+import { getScheduleDays, scheduledTotal } from "@/lib/schedule";
 import { isAdmin } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -25,15 +27,21 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ t
   else after(() => syncAll(true));
 
   const upcoming = [today, addDays(today, 1), addDays(today, 2)];
-  const [days, payments, settings, calendars, admin, ...eventsByDay] = await Promise.all([
-    getDays(), getPayments(), getSettings(), listCalendars(), isAdmin(), ...upcoming.map(getEventsOn),
+  const curStart = periodStart(today);
+  const [days, payments, settings, calendars, admin, schedule, ...eventsByDay] = await Promise.all([
+    getDays(), getPayments(), getSettings(), listCalendars(), isAdmin(),
+    // the current pay period plus anything of the next 3 days that spills into the next one
+    getScheduleDays(curStart, addDays(curStart, 13)), ...upcoming.map(getEventsOn),
   ]);
   const periods = buildPeriods(days, payments, settings);
   const items = periods.map((period) => ({ period, status: periodStatus(period, today) }));
 
-  const curStart = periodStart(today);
   const current = items.find((i) => i.period.start === curStart);
   const showAdmin = admin && tab === "admin";
+  const scheduleByDate = new Map(schedule.map((d) => [d.date, d]));
+  const dayByDate = new Map(days.map((d) => [d.date, d]));
+  const periodSchedule = schedule.filter((d) => d.date <= addDays(curStart, 6));
+  const planned = scheduledTotal(periodSchedule);
 
   return (
     <>
@@ -57,6 +65,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ t
               upcoming.map((date, i) => (
                 <div key={date} className="agday">
                   <h3 className="dayhead">{i === 0 ? "Today" : i === 1 ? "Tomorrow" : fmtDow(date)} · {fmtDate(date)}</h3>
+                  {scheduleByDate.has(date) && <ScheduleDay day={scheduleByDate.get(date)!} logged={dayByDate.get(date)} today={today} />}
                   {eventsByDay[i].length > 0 ? (
                     eventsByDay[i].map((e) => <Event key={e.id} e={e} />)
                   ) : (
@@ -73,8 +82,20 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ t
               <div className="stat"><div className="n">{hrs(current?.period.total ?? 0)}</div><div className="k">hours so far</div></div>
               <div className="stat"><div className="n">{hrs(current?.period.ot ?? 0)}</div><div className="k">overtime hours</div></div>
               <div className="stat"><div className="n">{money(current?.period.personalDue ?? 0)}</div><div className="k">personal due so far</div></div>
+              <div className="stat">
+                <div className="n">{periodSchedule.length ? hrs(planned.minutes / 60) : "—"}</div>
+                <div className="k">
+                  {periodSchedule.length
+                    ? `scheduled total hours${planned.open ? ` + ${planned.open} day${planned.open === 1 ? "" : "s"} without a total` : ""}`
+                    : "scheduled total hours"}
+                </div>
+              </div>
             </div>
-            <p className="small"><Link href={`/timesheet?view=period&p=${curStart}`}>Edit this pay period →</Link></p>
+            <p className="small">
+              <Link href={`/timesheet?view=period&p=${curStart}`}>Edit this pay period →</Link>
+              {" · "}
+              <Link href="/schedule">{periodSchedule.length ? "See the schedule →" : admin ? "Deduce the schedule →" : "Schedule →"}</Link>
+            </p>
           </section>
         </>
       )}

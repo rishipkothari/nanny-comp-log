@@ -68,6 +68,18 @@ await sql`CREATE TABLE IF NOT EXISTS calendar_events (
 // Wall-clock times in the zone each event was created in (the app never shifts them to the viewer's zone).
 await sql`ALTER TABLE calendar_events ADD COLUMN IF NOT EXISTS start_local timestamp`;
 await sql`ALTER TABLE calendar_events ADD COLUMN IF NOT EXISTS end_local timestamp`;
+// Calendars that hold the nanny's schedule feed schedule deduction; deduced days are cached per date.
+await sql`ALTER TABLE calendars ADD COLUMN IF NOT EXISTS is_schedule boolean NOT NULL DEFAULT false`;
+await sql`CREATE TABLE IF NOT EXISTS schedule_days (
+  date date PRIMARY KEY,
+  working boolean NOT NULL,
+  blocks jsonb NOT NULL,
+  total_minutes integer,
+  confidence text NOT NULL,
+  explanation text NOT NULL DEFAULT '',
+  input_hash text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+)`;
 await sql`CREATE INDEX IF NOT EXISTS calendar_events_start ON calendar_events (start_at)`;
 await sql`CREATE INDEX IF NOT EXISTS calendar_events_calendar ON calendar_events (calendar_id)`;
 

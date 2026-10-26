@@ -11,6 +11,8 @@ export type Calendar = {
   label: string;
   color: string;
   enabled: boolean;
+  /** The calendar holds the nanny's schedule, so it feeds schedule deduction. */
+  is_schedule: boolean;
   last_synced: string | null;
   last_error: string | null;
   /** Subscription URLs are credentials (secret iCal addresses), so only a masked form leaves the server. */
@@ -223,10 +225,11 @@ export function parseEvents(text: string, from: Date, to: Date): Row[] {
 let schemaReady: Promise<void> | null = null;
 
 /** Adds the wall-clock columns on first use so the code can ship before db:setup has been run. */
-function ensureSchema(): Promise<void> {
+export function ensureSchema(): Promise<void> {
   schemaReady ??= (async () => {
     await sql.query(`ALTER TABLE calendar_events ADD COLUMN IF NOT EXISTS start_local timestamp`);
     await sql.query(`ALTER TABLE calendar_events ADD COLUMN IF NOT EXISTS end_local timestamp`);
+    await sql.query(`ALTER TABLE calendars ADD COLUMN IF NOT EXISTS is_schedule boolean NOT NULL DEFAULT false`);
     // Rows from before the columns existed get a best guess now and are re-fetched for the real zone.
     const filled = await sql.query(
       `UPDATE calendar_events SET
@@ -245,13 +248,14 @@ function ensureSchema(): Promise<void> {
 export async function listCalendars(): Promise<Calendar[]> {
   await ensureSchema();
   const rows = await sql.query(
-    `SELECT id, label, color, enabled, url, last_error, to_char(last_synced AT TIME ZONE 'UTC', ${ISO}) AS last_synced FROM calendars ORDER BY id`,
+    `SELECT id, label, color, enabled, is_schedule, url, last_error, to_char(last_synced AT TIME ZONE 'UTC', ${ISO}) AS last_synced FROM calendars ORDER BY id`,
   );
   return rows.map((r) => ({
     id: r.id as number,
     label: r.label as string,
     color: r.color as string,
     enabled: r.enabled as boolean,
+    is_schedule: r.is_schedule as boolean,
     last_synced: (r.last_synced as string) ?? null,
     last_error: (r.last_error as string) ?? null,
     url_masked: maskUrl(r.url as string),
@@ -309,23 +313,28 @@ function toEvent(r: Record<string, unknown>): DayEvent {
   };
 }
 
-/** Events touching one calendar date (end-exclusive for all-day events, last instant for timed ones). */
-export async function getEventsOn(date: string): Promise<DayEvent[]> {
+/** Events touching the dates from..to (end-exclusive for all-day events, last instant for timed ones). */
+async function eventsBetween(from: string, to: string, scheduleOnly: boolean): Promise<DayEvent[]> {
   await ensureSchema();
   const rows = await sql.query(
     `SELECT ${EVENT_COLS}
      FROM calendar_events e JOIN calendars c ON c.id = e.calendar_id
-     WHERE c.enabled AND (
-       (e.all_day AND e.start_local::date <= $1::date AND e.end_local::date > $1::date)
+     WHERE c.enabled ${scheduleOnly ? "AND c.is_schedule" : ""} AND (
+       (e.all_day AND e.start_local::date <= $2::date AND e.end_local::date > $1::date)
        OR (NOT e.all_day
-         AND e.start_local::date <= $1::date
+         AND e.start_local::date <= $2::date
          AND (GREATEST(e.end_local, e.start_local + interval '1 second') - interval '1 second')::date >= $1::date)
      )
      ORDER BY e.all_day DESC, e.start_local, e.title`,
-    [date],
+    [from, to],
   );
   return rows.map(toEvent);
 }
+
+export const getEventsOn = (date: string) => eventsBetween(date, date, false);
+
+/** Events of the calendars marked as holding the schedule, for schedule deduction. */
+export const getScheduleEvents = (from: string, to: string) => eventsBetween(from, to, true);
 
 /** Every stored event of the enabled calendars; the sync window already bounds the set. */
 export async function getAllEvents(): Promise<DayEvent[]> {

@@ -158,7 +158,7 @@ code { font-size: 12px; }
 .event { display: flex; gap: 10px; padding: 10px 14px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; margin-bottom: 6px; align-items: flex-start; }
 .event .bar { width: 4px; align-self: stretch; border-radius: 2px; flex: 0 0 4px; }
 .event .when { color: var(--muted); font-size: 13px; }
-.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; margin-bottom: 8px; }
 .stat { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
 .stat .n { font-size: 20px; font-weight: 600; }
 .stat .k { color: var(--muted); font-size: 12px; }
@@ -207,3 +207,20 @@ button.danger { color: var(--bad); border-color: var(--bad); background: transpa
 .mcell.picked { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .mcell .dots { display: flex; gap: 3px; min-height: 6px; }
 .mcell .dots i { width: 6px; height: 6px; border-radius: 50%; display: block; }
+
+/* schedule */
+.sched { padding: 10px 14px; background: var(--accent-soft); border: 1px solid var(--line); border-radius: 10px; margin-bottom: 6px; }
+.schedtop { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.schedlabel { font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--accent); }
+.sched .blocks { display: flex; flex-wrap: wrap; gap: 4px 12px; flex: 1; }
+.sched .blk { font-weight: 500; white-space: nowrap; }
+.schedtotal { margin-left: auto; font-weight: 600; white-space: nowrap; }
+.sched .small { margin-top: 4px; }
+.sched .savebar { margin-top: 8px; min-height: 0; }
+.pill.conf.low { background: transparent; color: var(--bad); border: 1px solid var(--bad); }
+.pill.conf.medium { background: transparent; color: var(--muted); border: 1px solid var(--line); }
+.schedctl { margin-bottom: 18px; }
+.schedctl .h3 { margin: 12px 0 8px; }
+.schedctl textarea.notes { width: 100%; font: inherit; color: var(--text); padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); resize: vertical; }
+.schedctl .savebar { margin-top: 6px; }
+.schedcheck { margin: 8px 0 2px; }

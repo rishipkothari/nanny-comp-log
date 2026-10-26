@@ -40,7 +40,7 @@ export default function CalendarSettings({ calendars, editable }: { calendars: C
       <h2 className="h2">Calendars</h2>
       {calendars.length === 0 && <p className="muted small">No calendars yet.</p>}
       {calendars.map((c) => (
-        <CalendarRow key={`${c.id}-${c.label}-${c.color}-${c.enabled}`} c={c} editable={editable} busy={busy} call={call} />
+        <CalendarRow key={`${c.id}-${c.label}-${c.color}-${c.enabled}-${c.is_schedule}`} c={c} editable={editable} busy={busy} call={call} />
       ))}
       {editable && (
         <form
@@ -102,6 +102,7 @@ function CalendarRow({
           <strong>{c.label}</strong>
         )}
         {!c.enabled && <span className="pill">off</span>}
+        {c.is_schedule && !editable && <span className="pill">schedule</span>}
       </div>
       <div className="muted small">
         {c.last_error ? <span className="err">Sync failed: {c.last_error}</span> : c.last_synced ? `Synced ${fmtDateTime(c.last_synced)}` : "Not synced yet"}
@@ -109,6 +110,10 @@ function CalendarRow({
       </div>
       {editable && (
         <>
+          <label className="check schedcheck">
+            <input type="checkbox" checked={c.is_schedule} disabled={off} onChange={() => call(tag, `/api/calendars/${c.id}`, "PATCH", { is_schedule: !c.is_schedule })} />
+            This calendar contains the schedule
+          </label>
           <div className="field">
             <label htmlFor={`u${c.id}`}>Replace URL</label>
             <input id={`u${c.id}`} type="url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Paste a new address to change" autoComplete="off" />
