@@ -5,3 +5,5 @@ node_modules
 import/
 next-env.d.ts
 *.tsbuildinfo
+
+.env*

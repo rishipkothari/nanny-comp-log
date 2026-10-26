@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start",
     "db:setup": "tsx --env-file=.env.local scripts/setup.ts",
+    "db:reset": "tsx --env-file=.env.local scripts/reset.ts",
     "db:import": "tsx --env-file=.env.local scripts/import.ts"
   },
   "dependencies": {

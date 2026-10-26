@@ -20,6 +20,10 @@ const num = (v: unknown): number | null => {
   const n = typeof v === "number" ? v : Number(String(v).replace(/[$,]/g, ""));
   return Number.isFinite(n) ? n : null;
 };
+const hm = (decimalHours: number) => {
+  const total = Math.round(decimalHours * 60);
+  return { h: Math.floor(total / 60), m: total % 60 };
+};
 
 // Full Log: A date, B hours, C minutes, E stipend, F expenses, G vacation, H sick, L holiday, M notes
 const log = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets["Full Log"], { header: 1, raw: true }).slice(1);
@@ -27,18 +31,25 @@ const days = [];
 for (const r of log) {
   const date = iso(r[0]);
   if (!date) continue;
+  const vac = hm(num(r[6]) ?? 0);
+  const sick = hm(num(r[7]) ?? 0);
+  const holiday = r[11] === true || String(r[11]).toUpperCase() === "TRUE";
   const row = {
     date,
-    hours: num(r[1]) ?? 0,
-    minutes: num(r[2]) ?? 0,
+    // a holiday day becomes 8h of holiday time and no working time
+    hours: holiday ? 0 : (num(r[1]) ?? 0),
+    minutes: holiday ? 0 : (num(r[2]) ?? 0),
     stipend: num(r[4]) ?? 0,
     expenses: num(r[5]) ?? 0,
-    vacation: num(r[6]) ?? 0,
-    sick: num(r[7]) ?? 0,
-    holiday: r[11] === true || String(r[11]).toUpperCase() === "TRUE",
+    vac_h: vac.h,
+    vac_m: vac.m,
+    sick_h: sick.h,
+    sick_m: sick.m,
+    hol_h: holiday && !(vac.h || vac.m) ? 8 : 0, // old holiday checkbox becomes 8h, unless the day is already a vacation day
+    hol_m: 0,
     notes: r[12] == null ? "" : String(r[12]),
   };
-  const empty = !row.hours && !row.minutes && !row.stipend && !row.expenses && !row.vacation && !row.sick && !row.holiday && !row.notes;
+  const empty = !row.hours && !row.minutes && !row.stipend && !row.expenses && !row.vac_h && !row.vac_m && !row.sick_h && !row.sick_m && !row.hol_h && !row.notes;
   if (!empty) days.push(row);
 }
 
@@ -63,10 +74,16 @@ for (const r of pay) {
 }
 
 for (const d of days) {
-  await sql`INSERT INTO days (date, hours, minutes, stipend, expenses, vacation, sick, holiday, notes)
-    VALUES (${d.date}, ${d.hours}, ${d.minutes}, ${d.stipend}, ${d.expenses}, ${d.vacation}, ${d.sick}, ${d.holiday}, ${d.notes})
+  // legacy columns are kept in sync for the previous release
+  const vacation = Math.round(((d.vac_h * 60 + d.vac_m) / 60) * 100) / 100;
+  const sick = Math.round(((d.sick_h * 60 + d.sick_m) / 60) * 100) / 100;
+  await sql`INSERT INTO days (date, hours, minutes, stipend, expenses, vac_h, vac_m, sick_h, sick_m, hol_h, hol_m, vacation, sick, holiday, notes)
+    VALUES (${d.date}, ${d.hours}, ${d.minutes}, ${d.stipend}, ${d.expenses}, ${d.vac_h}, ${d.vac_m}, ${d.sick_h}, ${d.sick_m}, ${d.hol_h}, ${d.hol_m},
+      ${vacation}, ${sick}, ${d.hol_h > 0}, ${d.notes})
     ON CONFLICT (date) DO UPDATE SET hours = EXCLUDED.hours, minutes = EXCLUDED.minutes, stipend = EXCLUDED.stipend,
-      expenses = EXCLUDED.expenses, vacation = EXCLUDED.vacation, sick = EXCLUDED.sick, holiday = EXCLUDED.holiday, notes = EXCLUDED.notes`;
+      expenses = EXCLUDED.expenses, vac_h = EXCLUDED.vac_h, vac_m = EXCLUDED.vac_m, sick_h = EXCLUDED.sick_h, sick_m = EXCLUDED.sick_m,
+      hol_h = EXCLUDED.hol_h, hol_m = EXCLUDED.hol_m, vacation = EXCLUDED.vacation, sick = EXCLUDED.sick, holiday = EXCLUDED.holiday,
+      notes = EXCLUDED.notes`;
 }
 for (const p of payments.values()) {
   await sql`INSERT INTO payments (period_start, homepay_earnings, homepay_net, homepay_date, personal_paid, personal_date, route, notes)
