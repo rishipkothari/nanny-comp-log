@@ -86,6 +86,7 @@ export default async function Summary({ searchParams }: { searchParams: Promise<
           unit="money"
           series={PAY_SERIES}
           today={today}
+          windows={["month", "quarter", "ytd", "year", "all"]}
           daily={null}
           periods={[...periods].reverse().map<Point>((p) => ({
             date: p.end,

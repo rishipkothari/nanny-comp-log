@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { fmtDate, fmtDow, hrs, money, totalHours, type DayRow, type Settings } from "@/lib/calc";
+import { emptyDay, fmtDate, fmtDow, hrs, money, totalHours, type DayRow, type Settings } from "@/lib/calc";
 import { useSaver } from "@/lib/useSaver";
 import SaveStatus from "./SaveStatus";
 
@@ -71,6 +71,7 @@ export default function PeriodGrid({ initial, settings }: Props) {
               <th rowSpan={2}>Total hrs</th>
               <th rowSpan={2} className="l">Notes</th>
               <th rowSpan={2} />
+              <th rowSpan={2} />
             </tr>
             <tr>
               {[0, 1, 2, 3].map((k) => (
@@ -101,7 +102,23 @@ export default function PeriodGrid({ initial, settings }: Props) {
                 <td className="notes">
                   <input type="text" value={r.notes} aria-label={`${fmtDate(r.date)} notes`} onChange={(e) => patch(i, { notes: e.target.value })} onBlur={() => flush(r.date)} />
                 </td>
-                <td className="st"><SaveStatus status={statuses[r.date]} compact /></td>
+                <td className="st">
+                  <SaveStatus status={statuses[r.date]} compact />
+                </td>
+                <td className="clr">
+                  <button
+                    type="button"
+                    className="danger small"
+                    aria-label={`Clear ${fmtDow(r.date)} ${fmtDate(r.date)}`}
+                    onClick={() => {
+                      if (!window.confirm(`Clear everything entered for ${fmtDow(r.date)} ${fmtDate(r.date)}?`)) return;
+                      patch(i, emptyDay(r.date));
+                      flush(r.date);
+                    }}
+                  >
+                    Clear
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -115,6 +132,7 @@ export default function PeriodGrid({ initial, settings }: Props) {
               <td>{money(totals.stipend)}</td>
               <td>{money(totals.expenses)}</td>
               <td className="calc">{hrs(totals.total)}</td>
+              <td />
               <td />
               <td />
             </tr>

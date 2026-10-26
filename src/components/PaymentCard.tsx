@@ -106,6 +106,21 @@ export default function PaymentCard({ period, editable }: { period: Period; edit
         <div className="savebar">
           <button onClick={copy}>{copied ? "Copied" : "Copy Venmo note"}</button>
           {editable && <SaveStatus status={statuses[key]} />}
+          {editable && (
+            <button
+              type="button"
+              className="danger small"
+              onClick={() => {
+                if (!window.confirm(`Clear all payment details for ${fmtDate(period.start)} – ${fmtDate(period.end)}?`)) return;
+                const blank = { homepay_earnings: "", homepay_net: "", homepay_date: "", personal_paid: "", personal_date: "", route: "", notes: "" };
+                setF(blank);
+                queue(key, { period_start: period.start, ...blank });
+                flush(key);
+              }}
+            >
+              Clear payment
+            </button>
+          )}
         </div>
       </div>
     </details>

@@ -62,6 +62,9 @@ export type PaymentRow = {
   notes: string | null;
 };
 
+export const hasPaymentData = (p: PaymentRow) =>
+  [p.homepay_earnings, p.homepay_net, p.homepay_date, p.personal_paid, p.personal_date, p.route, p.notes].some((v) => v !== null && v !== "");
+
 export type Period = {
   id: string;
   start: string;
@@ -90,7 +93,7 @@ export const totalHours = (d: DayRow) => workedHours(d) + vacationHours(d) + sic
 
 export function buildPeriods(days: DayRow[], payments: PaymentRow[], settings: Settings = DEFAULT_SETTINGS): Period[] {
   const byStart = new Map<string, Period>();
-  const payMap = new Map(payments.map((p) => [p.period_start, p]));
+  const payMap = new Map(payments.filter(hasPaymentData).map((p) => [p.period_start, p]));
 
   const ensure = (start: string): Period => {
     let p = byStart.get(start);
@@ -185,7 +188,8 @@ export function paymentsRows(periods: Period[], group: Group, today: string): Pa
   const year = today.slice(0, 4);
   const map = new Map<string, PaymentsRow>();
   for (const p of periods) {
-    if (group === "ytd" && p.end.slice(0, 4) !== year) continue;
+    // only pay periods that END inside the range count; year to date stops at today
+    if (group === "ytd" && (p.end.slice(0, 4) !== year || p.end > today)) continue;
     const key = group === "period" ? p.start : group === "month" ? p.end.slice(0, 7) : group === "year" ? p.end.slice(0, 4) : year;
     let r = map.get(key);
     if (!r) {

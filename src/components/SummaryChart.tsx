@@ -13,9 +13,10 @@ type Props = {
   daily: Point[] | null; // null: only pay-period points exist (payments)
   periods: Point[];
   today: string;
+  windows?: WindowKey[];
 };
 
-const WINDOWS = [
+export const WINDOWS = [
   { key: "week", label: "Week" },
   { key: "month", label: "Month" },
   { key: "quarter", label: "Quarter" },
@@ -23,7 +24,7 @@ const WINDOWS = [
   { key: "year", label: "Year" },
   { key: "all", label: "All" },
 ] as const;
-type WindowKey = (typeof WINDOWS)[number]["key"];
+export type WindowKey = (typeof WINDOWS)[number]["key"];
 
 function windowStart(w: WindowKey, today: string): string {
   switch (w) {
@@ -38,7 +39,8 @@ function windowStart(w: WindowKey, today: string): string {
 
 const short = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
 
-export default function SummaryChart({ unit, series, daily, periods, today }: Props) {
+export default function SummaryChart({ unit, series, daily, periods, today, windows }: Props) {
+  const available = WINDOWS.filter((w) => !windows || windows.includes(w.key));
   const [on, setOn] = useState<Record<string, boolean>>(() => Object.fromEntries(series.map((s) => [s.key, s.on])));
   const [win, setWin] = useState<WindowKey>(unit === "hours" ? "quarter" : "year");
 
@@ -53,8 +55,10 @@ export default function SummaryChart({ unit, series, daily, periods, today }: Pr
       }
       return { data: out, grain: "day" };
     }
-    return { data: periods.filter((p) => p.date >= start && p.date <= addDays(today, 6)), grain: "pay period" };
-  }, [win, today, daily, periods]);
+    // payments: only pay periods that ended inside the window; hours also show the period in progress
+    const last = unit === "money" ? today : addDays(today, 6);
+    return { data: periods.filter((p) => p.date >= start && p.date <= last), grain: "pay period" };
+  }, [win, today, daily, periods, unit]);
 
   const rows = data.map((p) => ({ label: p.label, ...Object.fromEntries(series.map((s) => [s.key, Number((p.values[s.key] ?? 0).toFixed(2))])) }));
   const fmt = (v: unknown) => (unit === "money" ? `$${Number(v).toLocaleString("en-US", { maximumFractionDigits: 0 })}` : `${Number(v).toFixed(1)}`);
@@ -62,7 +66,7 @@ export default function SummaryChart({ unit, series, daily, periods, today }: Pr
   return (
     <div>
       <div className="chips">
-        {WINDOWS.map((w) => (
+        {available.map((w) => (
           <button key={w.key} type="button" className={w.key === win ? "chip on" : "chip"} onClick={() => setWin(w.key)} aria-pressed={w.key === win}>
             {w.label}
           </button>

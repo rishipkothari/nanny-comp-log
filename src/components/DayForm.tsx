@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { totalHours, type DayRow } from "@/lib/calc";
+import { emptyDay, fmtDate, totalHours, type DayRow } from "@/lib/calc";
 import { useSaver } from "@/lib/useSaver";
 import SaveStatus from "./SaveStatus";
 import TimeInput from "./TimeInput";
@@ -45,6 +45,17 @@ export default function DayForm({ initial }: { initial: DayRow }) {
       </div>
       <div className="savebar">
         <SaveStatus status={statuses[key]} />
+        <button
+          type="button"
+          className="danger small"
+          onClick={() => {
+            if (!window.confirm(`Clear everything entered for ${fmtDate(d.date)}?`)) return;
+            patch(emptyDay(d.date));
+            flush(key);
+          }}
+        >
+          Clear day
+        </button>
       </div>
     </div>
   );

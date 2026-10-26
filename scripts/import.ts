@@ -36,15 +36,16 @@ for (const r of log) {
   const holiday = r[11] === true || String(r[11]).toUpperCase() === "TRUE";
   const row = {
     date,
-    hours: num(r[1]) ?? 0,
-    minutes: num(r[2]) ?? 0,
+    // a holiday day becomes 8h of holiday time and no working time
+    hours: holiday ? 0 : (num(r[1]) ?? 0),
+    minutes: holiday ? 0 : (num(r[2]) ?? 0),
     stipend: num(r[4]) ?? 0,
     expenses: num(r[5]) ?? 0,
     vac_h: vac.h,
     vac_m: vac.m,
     sick_h: sick.h,
     sick_m: sick.m,
-    hol_h: holiday ? 8 : 0, // old holiday checkbox becomes 8h
+    hol_h: holiday && !(vac.h || vac.m) ? 8 : 0, // old holiday checkbox becomes 8h, unless the day is already a vacation day
     hol_m: 0,
     notes: r[12] == null ? "" : String(r[12]),
   };
