@@ -194,6 +194,7 @@ button.danger { color: var(--bad); border-color: var(--bad); background: transpa
 .seg button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 .agday { margin-bottom: 14px; }
 .agday > h2 { font-size: 13px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); margin: 0 0 6px; display: flex; align-items: center; gap: 8px; }
+.agday > .dayhead { font-size: 14px; font-weight: 600; margin: 0 0 6px; }
 .pill { background: var(--accent); color: #fff; border-radius: 999px; padding: 1px 8px; font-size: 11px; letter-spacing: 0; text-transform: none; }
 .monthbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
 .monthbar strong { flex: 1; text-align: center; }

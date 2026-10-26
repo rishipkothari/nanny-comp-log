@@ -2,7 +2,7 @@ import Link from "next/link";
 import { after } from "next/server";
 import PaymentCard from "@/components/PaymentCard";
 import PeriodSummary from "@/components/PeriodSummary";
-import { addDays, buildPeriods, fmtDate, fmtDow, fmtLocalTime, hrs, money, needsAttention, periodStart, periodStatus, todayET, type Period, type PeriodStatus } from "@/lib/calc";
+import { addDays, buildPeriods, fmtDate, fmtDow, fmtLocalTime, holidayHours, hrs, sickHours, totalHours, vacationHours, workedHours, money, needsAttention, periodStart, periodStatus, todayET, type DayRow, type Period, type PeriodStatus } from "@/lib/calc";
 import { getEventsOn, hasUnsyncedCalendar, listCalendars, syncAll, type DayEvent } from "@/lib/calendar";
 import { getDays, getPayments, getSettings } from "@/lib/db";
 import { isAdmin } from "@/lib/session";
@@ -24,8 +24,9 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ t
   if (await hasUnsyncedCalendar()) await syncAll(true);
   else after(() => syncAll(true));
 
-  const [days, payments, settings, events, calendars, admin] = await Promise.all([
-    getDays(), getPayments(), getSettings(), getEventsOn(today), listCalendars(), isAdmin(),
+  const upcoming = [today, addDays(today, 1), addDays(today, 2)];
+  const [days, payments, settings, calendars, admin, ...eventsByDay] = await Promise.all([
+    getDays(), getPayments(), getSettings(), listCalendars(), isAdmin(), ...upcoming.map(getEventsOn),
   ]);
   const periods = buildPeriods(days, payments, settings);
   const items = periods.map((period) => ({ period, status: periodStatus(period, today) }));
@@ -46,20 +47,24 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ t
         <AdminTab items={items} curStart={curStart} today={today} venmoHandle={settings.venmoHandle} />
       ) : (
         <>
+          <TodaySummary days={days} today={today} curStart={curStart} />
+
           <section className="section">
-            <h2>Today · {fmtDow(today)} {fmtDate(today)}</h2>
-            {events.length > 0 ? (
-              events.map((e) => <Event key={e.id} e={e} />)
+            <h2>Next 3 days</h2>
+            {calendars.length === 0 ? (
+              <p className="muted small">No calendars connected. <Link href="/settings">Add one in settings.</Link></p>
             ) : (
-              <p className="muted small">
-                {calendars.length === 0 ? (
-                  <>No calendars connected. <Link href="/settings">Add one in settings.</Link></>
-                ) : (
-                  "Nothing on the calendar today."
-                )}
-              </p>
+              upcoming.map((date, i) => (
+                <div key={date} className="agday">
+                  <h3 className="dayhead">{i === 0 ? "Today" : i === 1 ? "Tomorrow" : fmtDow(date)} · {fmtDate(date)}</h3>
+                  {eventsByDay[i].length > 0 ? (
+                    eventsByDay[i].map((e) => <Event key={e.id} e={e} />)
+                  ) : (
+                    <p className="muted small">Nothing on the calendar.</p>
+                  )}
+                </div>
+              ))
             )}
-            <p className="small"><Link href="/timesheet">Open today&apos;s timesheet →</Link></p>
           </section>
 
           <section className="section">
@@ -74,6 +79,49 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ t
         </>
       )}
     </>
+  );
+}
+
+/** Hours logged today, or a reminder to log them, plus any weekdays earlier this pay period left blank. */
+function TodaySummary({ days, today, curStart }: { days: DayRow[]; today: string; curStart: string }) {
+  const byDate = new Map(days.map((d) => [d.date, d]));
+  const row = byDate.get(today);
+  const logged = row ? totalHours(row) : 0;
+  const missing: string[] = [];
+  for (let d = curStart; d < today; d = addDays(d, 1)) {
+    const dow = fmtDow(d);
+    const r = byDate.get(d);
+    if (dow !== "Sat" && dow !== "Sun" && !(r && totalHours(r) > 0)) missing.push(d);
+  }
+  const parts = row
+    ? ([["worked", workedHours(row)], ["vacation", vacationHours(row)], ["sick", sickHours(row)], ["holiday", holidayHours(row)]] as const)
+        .filter(([, h]) => h > 0)
+        .map(([k, h]) => `${hrs(h)} ${k}`)
+    : [];
+
+  return (
+    <section className="section">
+      <h2>Today · {fmtDow(today)} {fmtDate(today)}</h2>
+      {logged > 0 ? (
+        <Link href="/timesheet" className="banner ok">
+          {hrs(logged)} h logged today{parts.length > 1 ? ` (${parts.join(", ")})` : ""} · edit →
+        </Link>
+      ) : (
+        <Link href="/timesheet" className="banner warn">No hours logged yet today · log them →</Link>
+      )}
+      {missing.length > 0 && (
+        <p className="small">
+          Also no hours on{" "}
+          {missing.map((d, i) => (
+            <span key={d}>
+              {i > 0 && ", "}
+              <Link href={`/timesheet?d=${d}`}>{fmtDow(d)} {fmtDate(d)}</Link>
+            </span>
+          ))}
+          .
+        </p>
+      )}
+    </section>
   );
 }
 
