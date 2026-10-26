@@ -1,33 +1,37 @@
 import { neon } from "@neondatabase/serverless";
-import type { DayRow, PaymentRow } from "./calc";
+import { DEFAULT_SETTINGS, type DayRow, type PaymentRow, type Settings } from "./calc";
 
 export const sql = neon(process.env.DATABASE_URL!);
 
 const num = (v: unknown) => (v == null ? 0 : Number(v));
 
-type DayRecord = Record<string, unknown>;
+const DAY_COLS = `date::text AS date, hours, minutes, vac_h, vac_m, sick_h, sick_m, hol_h, hol_m, stipend, expenses, notes`;
 
-function toDay(r: DayRecord): DayRow {
+function toDay(r: Record<string, unknown>): DayRow {
   return {
     date: r.date as string,
-    hours: num(r.hours),
-    minutes: num(r.minutes),
+    wh: num(r.hours), wm: num(r.minutes),
+    vh: num(r.vac_h), vm: num(r.vac_m),
+    sh: num(r.sick_h), sm: num(r.sick_m),
+    hh: num(r.hol_h), hm: num(r.hol_m),
     stipend: num(r.stipend),
     expenses: num(r.expenses),
-    vacation: num(r.vacation),
-    sick: num(r.sick),
-    holiday: Boolean(r.holiday),
     notes: (r.notes as string) ?? "",
   };
 }
 
 export async function getDay(date: string): Promise<DayRow | null> {
-  const rows = await sql`SELECT date::text AS date, hours, minutes, stipend, expenses, vacation, sick, holiday, notes FROM days WHERE date = ${date}`;
+  const rows = await sql.query(`SELECT ${DAY_COLS} FROM days WHERE date = $1`, [date]);
   return rows[0] ? toDay(rows[0]) : null;
 }
 
+export async function getDayRange(from: string, to: string): Promise<DayRow[]> {
+  const rows = await sql.query(`SELECT ${DAY_COLS} FROM days WHERE date BETWEEN $1 AND $2 ORDER BY date`, [from, to]);
+  return rows.map(toDay);
+}
+
 export async function getDays(): Promise<DayRow[]> {
-  const rows = await sql`SELECT date::text AS date, hours, minutes, stipend, expenses, vacation, sick, holiday, notes FROM days ORDER BY date`;
+  const rows = await sql.query(`SELECT ${DAY_COLS} FROM days ORDER BY date`);
   return rows.map(toDay);
 }
 
@@ -43,4 +47,13 @@ export async function getPayments(): Promise<PaymentRow[]> {
     route: (r.route as string) ?? null,
     notes: (r.notes as string) ?? null,
   }));
+}
+
+export async function getSettings(): Promise<Settings> {
+  const rows = await sql`SELECT key, value FROM settings`;
+  const m = new Map(rows.map((r) => [r.key as string, Number(r.value)]));
+  return {
+    otRate: m.get("ot_rate") ?? DEFAULT_SETTINGS.otRate,
+    otThreshold: m.get("ot_threshold") ?? DEFAULT_SETTINGS.otThreshold,
+  };
 }
