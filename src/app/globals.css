@@ -180,3 +180,10 @@ code { font-size: 12px; }
 button.danger { color: var(--bad); border-color: var(--bad); background: transparent; }
 .savebar button.danger { margin-left: auto; }
 .grid td.clr { padding-right: 10px; }
+/* calendar view */
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 5px 12px; font-size: 14px; color: var(--muted); }
+.chip.on { color: var(--text); background: var(--accent-soft); }
+.chip .dot { width: 10px; height: 10px; border-radius: 50%; border: 2px solid; display: inline-block; }
+
+.fcwrap { margin-bottom: 14px; }
