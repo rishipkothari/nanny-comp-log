@@ -5,7 +5,8 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 const items = [
-  { href: "/", label: "Timesheet" },
+  { href: "/", label: "Home" },
+  { href: "/timesheet", label: "Timesheet" },
   { href: "/summary", label: "Summary" },
   { href: "/payments", label: "Payments" },
   { href: "/settings", label: "Settings" },

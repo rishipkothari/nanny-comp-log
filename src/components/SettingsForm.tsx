@@ -35,6 +35,15 @@ export default function SettingsForm({ initial, editable }: { initial: Settings;
           <span className="ro">{s.otThreshold}</span>
         )}
       </div>
+      <div className="field">
+        <label htmlFor="venmo">Venmo handle for personal pay</label>
+        {editable ? (
+          <input id="venmo" type="text" autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="username" value={s.venmoHandle}
+            onChange={(e) => patch({ venmoHandle: e.target.value.replace(/^@/, "").replace(/[^A-Za-z0-9_-]/g, "") })} onBlur={() => flush("settings")} />
+        ) : (
+          <span className="ro">{s.venmoHandle ? `@${s.venmoHandle}` : "—"}</span>
+        )}
+      </div>
       {editable && <div className="savebar"><SaveStatus status={statuses.settings} /></div>}
     </div>
   );

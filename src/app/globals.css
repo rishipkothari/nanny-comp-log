@@ -126,8 +126,45 @@ td.ot { color: var(--accent); font-weight: 600; }
 .card .body { padding: 0 14px 14px; }
 .pill { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
 .pill.ok { background: transparent; color: var(--ok); border: 1px solid var(--ok); }
+.pill.warn { background: transparent; color: var(--bad); border: 1px solid var(--bad); }
+.approval { display: flex; align-items: center; gap: 10px; flex: 1; justify-content: flex-end; }
+.approval input { width: 20px; height: 20px; }
+a.venmo { display: inline-flex; align-items: center; background: #3d95ce; color: #fff; border-radius: 8px; padding: 8px 14px; line-height: 1; }
+a.venmo:hover { filter: brightness(1.08); }
 .rowline { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; font-size: 14px; color: var(--muted); }
 .rowline b { color: var(--text); font-weight: 500; }
+
+/* calendars */
+.h2 { font-size: 18px; font-weight: 600; margin: 28px 0 8px; }
+.h3 { font-size: 15px; font-weight: 600; margin: 18px 0 0; }
+.calrow { padding: 12px 0; border-bottom: 1px solid var(--line); }
+.calrow.off { opacity: 0.6; }
+.calhead { display: flex; align-items: center; gap: 10px; margin-bottom: 2px; }
+.calhead input[type=color], .addcal input[type=color] { width: 36px; height: 30px; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: transparent; }
+.callabel { flex: 1; min-width: 0; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); }
+.addcal .field input[type=url] { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); }
+.calrow .field input[type=url] { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); }
+.calrow .savebar { margin-top: 8px; }
+code { font-size: 12px; }
+
+/* home */
+.hello { margin-bottom: 14px; }
+.banner { display: block; background: var(--accent-soft); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; margin-bottom: 14px; color: var(--text); }
+.banner.warn { border-color: var(--bad); }
+.banner.ok { color: var(--ok); }
+.section { margin-bottom: 20px; }
+.section > h2 { font-size: 13px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
+.event { display: flex; gap: 10px; padding: 10px 14px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; margin-bottom: 6px; align-items: flex-start; }
+.event .bar { width: 4px; align-self: stretch; border-radius: 2px; flex: 0 0 4px; }
+.event .when { color: var(--muted); font-size: 13px; }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.stat { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+.stat .n { font-size: 20px; font-weight: 600; }
+.stat .k { color: var(--muted); font-size: 12px; }
+.pcard { display: block; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; color: var(--text); }
+.pcard .top { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.pcard .vals { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; }
+.pcard .vals div > span { display: block; color: var(--muted); font-size: 12px; }
 
 /* login + password */
 .login { max-width: 360px; margin: 18vh auto 0; padding: 0 16px; }

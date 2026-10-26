@@ -1,72 +1,92 @@
 import Link from "next/link";
-import DayForm from "@/components/DayForm";
-import PeriodGrid from "@/components/PeriodGrid";
-import { addDays, emptyDay, fmtDate, fmtDow, periodId, periodStart, todayET, type DayRow } from "@/lib/calc";
-import { getDay, getDayRange, getSettings } from "@/lib/db";
+import { after } from "next/server";
+import PeriodSummary from "@/components/PeriodSummary";
+import { addDays, buildPeriods, fmtDate, fmtDow, fmtTime, hrs, money, needsAttention, periodStart, periodStatus, todayET } from "@/lib/calc";
+import { getEventsOn, hasUnsyncedCalendar, listCalendars, syncAll, type DayEvent } from "@/lib/calendar";
+import { getDays, getPayments, getSettings } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
-const isDate = (s: string | undefined): s is string => !!s && /^\d{4}-\d{2}-\d{2}$/.test(s);
-
-export default async function Timesheet({ searchParams }: { searchParams: Promise<{ d?: string; view?: string; p?: string }> }) {
-  const { d, view, p } = await searchParams;
-  const period = view === "period";
+export default async function Home() {
   const today = todayET();
 
+  // A calendar that has never synced is fetched before rendering; stale ones refresh after the response.
+  if (await hasUnsyncedCalendar()) await syncAll(true);
+  else after(() => syncAll(true));
+
+  const [days, payments, settings, events, calendars] = await Promise.all([
+    getDays(), getPayments(), getSettings(), getEventsOn(today), listCalendars(),
+  ]);
+  const periods = buildPeriods(days, payments, settings);
+  const items = periods.map((period) => ({ period, status: periodStatus(period, today) }));
+
+  const curStart = periodStart(today);
+  const current = items.find((i) => i.period.start === curStart);
+  const last = items.find((i) => i.period.start === addDays(curStart, -7));
+  const attention = items.filter((i) => needsAttention(i.status));
+  const older = attention.filter((i) => i !== last);
+
   return (
     <>
-      <div className="tabs">
-        <Link href={isDate(d) ? `/?d=${d}` : "/"} className={period ? "" : "on"}>Daily</Link>
-        <Link href={isDate(p) ? `/?view=period&p=${p}` : "/?view=period"} className={period ? "on" : ""}>Pay period</Link>
-      </div>
-      {period ? <PeriodView anchor={isDate(p) ? p : today} /> : <DailyView date={isDate(d) ? d : today} />}
+      {attention.length > 0 ? (
+        <a href="#attention" className="banner warn">
+          {attention.length} pay period{attention.length === 1 ? "" : "s"} not settled yet
+        </a>
+      ) : (
+        <div className="banner ok">All pay periods are settled.</div>
+      )}
+
+      <section className="section">
+        <h2>Today · {fmtDow(today)} {fmtDate(today)}</h2>
+        {events.length > 0 ? (
+          events.map((e) => <Event key={e.id} e={e} />)
+        ) : (
+          <p className="muted small">
+            {calendars.length === 0 ? (
+              <>No calendars connected. <Link href="/settings">Add one in settings.</Link></>
+            ) : (
+              "Nothing on the calendar today."
+            )}
+          </p>
+        )}
+      </section>
+
+      <section className="section">
+        <h2>This pay period · {fmtDate(curStart)} – {fmtDate(addDays(curStart, 6))}</h2>
+        <div className="stats">
+          <div className="stat"><div className="n">{hrs(current?.period.total ?? 0)}</div><div className="k">hours so far</div></div>
+          <div className="stat"><div className="n">{hrs(current?.period.ot ?? 0)}</div><div className="k">overtime hours</div></div>
+          <div className="stat"><div className="n">{money(current?.period.personalDue ?? 0)}</div><div className="k">personal due so far</div></div>
+        </div>
+        <p className="small"><Link href={`/timesheet?view=period&p=${curStart}`}>Open this pay period →</Link></p>
+      </section>
+
+      <section className="section">
+        <h2>Last pay period</h2>
+        {last ? <PeriodSummary period={last.period} status={last.status} /> : <p className="muted small">No activity recorded for the last pay period.</p>}
+      </section>
+
+      {older.length > 0 && (
+        <section className="section" id="attention">
+          <h2>Still needs attention</h2>
+          {older.map((i) => <PeriodSummary key={i.period.start} period={i.period} status={i.status} />)}
+        </section>
+      )}
     </>
   );
 }
 
-async function DailyView({ date }: { date: string }) {
-  const row: DayRow = (await getDay(date)) ?? emptyDay(date);
+function Event({ e }: { e: DayEvent }) {
   return (
-    <>
-      <div className="datebar">
-        <div>
-          <div className="bigdate">{fmtDow(date)} {fmtDate(date)}</div>
-          <div className="muted small">Pay period {periodId(periodStart(date))}</div>
-        </div>
-        <div className="arrows">
-          <Link className="btn small" href={`/?d=${addDays(date, -1)}`} aria-label="Previous day">◀</Link>
-          <Link className="btn small" href="/">Today</Link>
-          <Link className="btn small" href={`/?d=${addDays(date, 1)}`} aria-label="Next day">▶</Link>
+    <div className="event">
+      <span className="bar" style={{ background: e.color }} />
+      <div>
+        <div>{e.title}</div>
+        <div className="when">
+          {e.all_day ? "All day" : `${fmtTime(e.start_at)} – ${fmtTime(e.end_at)}`}
+          {e.location ? ` · ${e.location}` : ""} · {e.calendar}
         </div>
       </div>
-      <DayForm key={date} initial={row} />
-    </>
-  );
-}
-
-async function PeriodView({ anchor }: { anchor: string }) {
-  const start = periodStart(anchor);
-  const end = addDays(start, 6);
-  const [existing, settings] = await Promise.all([getDayRange(start, end), getSettings()]);
-  const byDate = new Map(existing.map((r) => [r.date, r]));
-  const rows = Array.from({ length: 7 }, (_, i) => {
-    const date = addDays(start, i);
-    return byDate.get(date) ?? emptyDay(date);
-  });
-  return (
-    <>
-      <div className="datebar">
-        <div>
-          <div className="bigdate">{fmtDate(start)} – {fmtDate(end)}</div>
-          <div className="muted small">Pay period {periodId(start)}</div>
-        </div>
-        <div className="arrows">
-          <Link className="btn small" href={`/?view=period&p=${addDays(start, -7)}`} aria-label="Previous pay period">◀</Link>
-          <Link className="btn small" href="/?view=period">This period</Link>
-          <Link className="btn small" href={`/?view=period&p=${addDays(start, 7)}`} aria-label="Next pay period">▶</Link>
-        </div>
-      </div>
-      <PeriodGrid key={start} initial={rows} settings={settings} />
-    </>
+    </div>
   );
 }
