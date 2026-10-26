@@ -30,10 +30,10 @@ export default async function Home() {
     <>
       {attention.length > 0 ? (
         <a href="#attention" className="banner warn">
-          {attention.length} pay period{attention.length === 1 ? "" : "s"} not settled yet
+          {attention.length} pay period{attention.length === 1 ? "" : "s"} not approved or not balanced
         </a>
       ) : (
-        <div className="banner ok">All pay periods are settled.</div>
+        <div className="banner ok">All pay periods are approved and balanced.</div>
       )}
 
       <section className="section">

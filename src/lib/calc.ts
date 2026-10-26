@@ -144,27 +144,30 @@ export function buildPeriods(days: DayRow[], payments: PaymentRow[], settings: S
 
 /* ---------- settlement status ---------- */
 
-export type StatusKind = "open" | "awaiting" | "owed" | "settled";
-export type PeriodStatus = { kind: StatusKind; label: string; outstanding: number };
+export type Badge = { label: string; tone: "ok" | "warn" | "neutral" };
+export type PeriodStatus = { open: boolean; approved: boolean; balanced: boolean; outstanding: number; badges: Badge[] };
 
 /**
- * One definition of "settled" for the whole app: the period has ended, payment is approved,
- * and personal pay due equals personal pay made.
+ * One definition of status for the whole app. A closed period carries two independent badges:
+ * whether its hours are approved, and whether personal pay made equals personal pay due (balanced).
  */
 export function periodStatus(
   p: { end: string; personalDue: number; personalPaid: number; approved: boolean },
   today: string,
 ): PeriodStatus {
   const outstanding = p.personalDue - p.personalPaid;
-  if (p.end >= today) return { kind: "open", label: "open", outstanding };
-  if (!p.approved) return { kind: "awaiting", label: "needs approval", outstanding };
-  if (outstanding >= 0.005) return { kind: "owed", label: `${money(outstanding)} owed`, outstanding };
-  // Paying more than was due leaves nothing owed, so it settles; the label keeps the difference visible.
-  if (outstanding <= -0.005) return { kind: "settled", label: `settled · ${money(-outstanding)} over`, outstanding };
-  return { kind: "settled", label: "settled", outstanding };
+  const balanced = Math.abs(outstanding) < 0.005;
+  if (p.end >= today) return { open: true, approved: p.approved, balanced, outstanding, badges: [{ label: "open", tone: "neutral" }] };
+  const badges: Badge[] = [
+    p.approved ? { label: "hours approved", tone: "ok" } : { label: "hours not approved", tone: "warn" },
+    balanced
+      ? { label: "balanced", tone: "ok" }
+      : { label: outstanding > 0 ? `${money(outstanding)} owed` : `${money(-outstanding)} over`, tone: "warn" },
+  ];
+  return { open: false, approved: p.approved, balanced, outstanding, badges };
 }
 
-export const needsAttention = (s: PeriodStatus) => s.kind === "awaiting" || s.kind === "owed";
+export const needsAttention = (s: PeriodStatus) => !s.open && (!s.approved || !s.balanced);
 
 /* ---------- grouping for the summary tables ---------- */
 

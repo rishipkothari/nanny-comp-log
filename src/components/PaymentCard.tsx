@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { fmtDate, fmtDateTime, hrs, money, periodStatus, venmoNote, type Period } from "@/lib/calc";
 import { useSaver } from "@/lib/useSaver";
 import SaveStatus from "./SaveStatus";
+import StatusBadges from "./StatusBadges";
 import VenmoBadge from "./VenmoBadge";
 
 const ROUTES = ["Venmo", "Cash", "Zelle"];
@@ -90,8 +91,6 @@ export default function PaymentCard({ period, editable, today, venmoHandle, defa
     </div>
   );
 
-  const pillClass = status.kind === "settled" ? "pill ok" : status.kind === "awaiting" ? "pill warn" : "pill";
-
   return (
     <details ref={ref} id={`p-${period.start}`} className="card" open={open} onToggle={(e) => setOpen(e.currentTarget.open)}>
       <summary>
@@ -101,13 +100,13 @@ export default function PaymentCard({ period, editable, today, venmoHandle, defa
         </div>
         <div style={{ textAlign: "right" }}>
           <div>{money(net + paid)}</div>
-          <span className={pillClass}>{status.label}</span>
+          <StatusBadges status={status} />
         </div>
       </summary>
       <div className="body">
         <div className="rowline"><span>Personal comp due</span><b>{money(period.personalDue)}</b></div>
         <div className="field">
-          <label htmlFor={`ap-${key}`}>Payment approved</label>
+          <label htmlFor={`ap-${key}`}>Hours approved</label>
           <div className="approval">
             {editable ? (
               <input id={`ap-${key}`} type="checkbox" checked={f.approved} onChange={(e) => set("approved", e.target.checked, true)} />
@@ -145,7 +144,7 @@ export default function PaymentCard({ period, editable, today, venmoHandle, defa
         </div>
         <div className="rowline"><span>Total paid</span><b>{money(net + paid)}</b></div>
         <div className="savebar">
-          <button onClick={copy}>{copied ? "Copied" : "Copy Venmo note"}</button>
+          {editable && <button onClick={copy}>{copied ? "Copied" : "Copy Venmo note"}</button>}
           {canVenmo && <VenmoBadge handle={venmoHandle} amount={outstanding} note={venmoNote(period)} />}
           {editable && <SaveStatus status={statuses[key]} />}
           {editable && (

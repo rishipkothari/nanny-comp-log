@@ -127,6 +127,7 @@ td.ot { color: var(--accent); font-weight: 600; }
 .pill { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
 .pill.ok { background: transparent; color: var(--ok); border: 1px solid var(--ok); }
 .pill.warn { background: transparent; color: var(--bad); border: 1px solid var(--bad); }
+.badges { display: inline-flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; }
 .approval { display: flex; align-items: center; gap: 10px; flex: 1; justify-content: flex-end; }
 .approval input { width: 20px; height: 20px; }
 a.venmo { display: inline-flex; align-items: center; background: #3d95ce; color: #fff; border-radius: 8px; padding: 8px 14px; line-height: 1; }
