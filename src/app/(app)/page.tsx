@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { after } from "next/server";
 import PeriodSummary from "@/components/PeriodSummary";
-import { addDays, buildPeriods, fmtDate, fmtDow, fmtTime, hrs, money, needsAttention, periodStart, periodStatus, todayET } from "@/lib/calc";
+import { addDays, buildPeriods, fmtDate, fmtDow, fmtLocalTime, hrs, money, needsAttention, periodStart, periodStatus, todayET } from "@/lib/calc";
 import { getEventsOn, hasUnsyncedCalendar, listCalendars, syncAll, type DayEvent } from "@/lib/calendar";
 import { getDays, getPayments, getSettings } from "@/lib/db";
 
@@ -83,7 +83,7 @@ function Event({ e }: { e: DayEvent }) {
       <div>
         <div>{e.title}</div>
         <div className="when">
-          {e.all_day ? "All day" : `${fmtTime(e.start_at)} – ${fmtTime(e.end_at)}`}
+          {e.all_day ? "All day" : `${fmtLocalTime(e.start)} – ${fmtLocalTime(e.end)}`}
           {e.location ? ` · ${e.location}` : ""} · {e.calendar}
         </div>
       </div>

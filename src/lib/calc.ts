@@ -265,6 +265,12 @@ export function fmtTime(iso: string): string {
   return new Date(iso).toLocaleTimeString("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" });
 }
 
+/** "9:30 AM" from a local wall-clock string ("2026-10-26T09:30:00"); no zone conversion happens. */
+export function fmtLocalTime(local: string): string {
+  const h = Number(local.slice(11, 13));
+  return `${h % 12 || 12}:${local.slice(14, 16)} ${h < 12 ? "AM" : "PM"}`;
+}
+
 export function fmtDow(s: string): string {
   return new Date(parse(s)).toLocaleString("en-US", { weekday: "short", timeZone: "UTC" });
 }

@@ -65,6 +65,9 @@ await sql`CREATE TABLE IF NOT EXISTS calendar_events (
   title text NOT NULL DEFAULT '',
   location text NOT NULL DEFAULT ''
 )`;
+// Wall-clock times in the zone each event was created in (the app never shifts them to the viewer's zone).
+await sql`ALTER TABLE calendar_events ADD COLUMN IF NOT EXISTS start_local timestamp`;
+await sql`ALTER TABLE calendar_events ADD COLUMN IF NOT EXISTS end_local timestamp`;
 await sql`CREATE INDEX IF NOT EXISTS calendar_events_start ON calendar_events (start_at)`;
 await sql`CREATE INDEX IF NOT EXISTS calendar_events_calendar ON calendar_events (calendar_id)`;
 
