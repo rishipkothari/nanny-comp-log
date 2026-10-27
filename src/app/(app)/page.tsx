@@ -3,10 +3,10 @@ import { after } from "next/server";
 import PaymentCard from "@/components/PaymentCard";
 import CurrentPeriodCard from "@/components/CurrentPeriodCard";
 import ScheduleDay from "@/components/ScheduleDay";
-import { addDays, buildPeriods, fmtDate, fmtDow, fmtLocalTime, holidayHours, hrs, sickHours, totalHours, vacationHours, workedHours, needsAttention, periodStart, periodStatus, todayET, type DayRow, type Period, type PeriodStatus } from "@/lib/calc";
+import { addDays, buildPeriods, fmtDate, fmtDow, fmtLocalTime, holidayHours, hrs, sickHours, totalHours, vacationHours, workedHours, needsAttention, periodDetail, periodStart, todayET, type DayRow, type PeriodDetail, type Scheduled } from "@/lib/calc";
 import { getEventsOn, hasUnsyncedCalendar, listCalendars, syncAll, type DayEvent } from "@/lib/calendar";
 import { getDays, getPayments, getSettings } from "@/lib/db";
-import { getScheduleDays, scheduledTotal } from "@/lib/schedule";
+import { getScheduleDays, scheduledByPeriod, scheduledTotal } from "@/lib/schedule";
 import { isAdmin } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -28,21 +28,26 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ t
 
   const upcoming = [today, addDays(today, 1), addDays(today, 2)];
   const curStart = periodStart(today);
-  const [days, payments, settings, calendars, admin, schedule, ...eventsByDay] = await Promise.all([
+  const cutoff = monthsAgo(today, 2);
+  const [days, payments, settings, calendars, admin, schedule, pastScheduled, ...eventsByDay] = await Promise.all([
     getDays(), getPayments(), getSettings(), listCalendars(), isAdmin(),
     // the current pay period plus anything of the next 3 days that spills into the next one
-    getScheduleDays(curStart, addDays(curStart, 13)), ...upcoming.map(getEventsOn),
+    getScheduleDays(curStart, addDays(curStart, 13)),
+    // earlier periods the admin tab can show
+    tab === "admin" ? scheduledByPeriod(periodStart(cutoff), addDays(curStart, -1)) : new Map<string, Scheduled>(),
+    ...upcoming.map(getEventsOn),
   ]);
   const periods = buildPeriods(days, payments, settings);
-  const items = periods.map((period) => ({ period, status: periodStatus(period, today) }));
-
-  const current = items.find((i) => i.period.start === curStart);
   const showAdmin = admin && tab === "admin";
   const scheduleByDate = new Map(schedule.map((d) => [d.date, d]));
   const dayByDate = new Map(days.map((d) => [d.date, d]));
   const periodSchedule = schedule.filter((d) => d.date <= addDays(curStart, 6));
   const planned = periodSchedule.length ? scheduledTotal(periodSchedule) : null;
-  const periodCard = <CurrentPeriodCard start={curStart} period={current?.period} status={current?.status} planned={planned} admin={admin} />;
+  const items = periods.map((p) => periodDetail(p, today, settings, p.start === curStart ? planned : pastScheduled.get(p.start) ?? null));
+  const current = items.find((i) => i.period.start === curStart);
+  const periodCard = (
+    <CurrentPeriodCard start={curStart} period={current?.period} status={current?.status} planned={planned} admin={admin} detail={current} />
+  );
 
   return (
     <>
@@ -53,7 +58,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ t
         </div>
       )}
       {showAdmin ? (
-        <AdminTab items={items} curStart={curStart} today={today} venmoHandle={settings.venmoHandle} periodCard={periodCard} />
+        <AdminTab items={items} curStart={curStart} cutoff={cutoff} today={today} venmoHandle={settings.venmoHandle} periodCard={periodCard} />
       ) : (
         <>
           <TodaySummary days={days} today={today} curStart={curStart} />
@@ -150,18 +155,15 @@ function TodaySummary({ days, today, curStart }: { days: DayRow[]; today: string
   );
 }
 
-type Item = { period: Period; status: PeriodStatus };
-
-function AdminTab({ items, curStart, today, venmoHandle, periodCard }: {
-  items: Item[]; curStart: string; today: string; venmoHandle: string; periodCard: React.ReactNode;
+function AdminTab({ items, curStart, cutoff, today, venmoHandle, periodCard }: {
+  items: PeriodDetail[]; curStart: string; cutoff: string; today: string; venmoHandle: string; periodCard: React.ReactNode;
 }) {
   const lastStart = addDays(curStart, -7);
   const last = items.find((i) => i.period.start === lastStart);
-  const cutoff = monthsAgo(today, 2);
   const delinquent = items.filter((i) => i.period.start !== lastStart && i.period.end >= cutoff && needsAttention(i.status));
   const flagged = delinquent.length + (last && needsAttention(last.status) ? 1 : 0);
-  const card = (i: Item) => (
-    <PaymentCard key={i.period.start} period={i.period} editable today={today} venmoHandle={venmoHandle} />
+  const card = (i: PeriodDetail) => (
+    <PaymentCard key={i.period.start} period={i.period} editable today={today} venmoHandle={venmoHandle} detail={i} />
   );
 
   return (

@@ -178,14 +178,25 @@ export function periodStatus(
   const homepayMissing = p.total > 0 && p.homepayNet <= 0;
   const balanced = personalBalanced && !homepayMissing;
   if (p.end >= today) return { open: true, approved: p.approved, balanced, outstanding, badges: [{ label: "open", tone: "neutral" }] };
-  const badges: Badge[] = [p.approved ? { label: "hours approved", tone: "ok" } : { label: "hours not approved", tone: "warn" }];
-  if (homepayMissing) badges.push({ label: "homepay not paid", tone: "warn" });
-  if (!personalBalanced) badges.push({ label: outstanding > 0 ? `${money(outstanding)} owed` : `${money(-outstanding)} over`, tone: "warn" });
-  if (balanced) badges.push({ label: "balanced", tone: "ok" });
+  const badges: Badge[] = [
+    p.approved ? { label: "hours approved", tone: "ok" } : { label: "hours not approved", tone: "warn" },
+    balanced ? { label: "balanced", tone: "ok" } : { label: "unbalanced", tone: "warn" },
+  ];
   return { open: false, approved: p.approved, balanced, outstanding, badges };
 }
 
 export const needsAttention = (s: PeriodStatus) => !s.open && (!s.approved || !s.balanced);
+
+/* ---------- pay period detail ---------- */
+
+export type Scheduled = { minutes: number; open: number };
+
+/** Everything the pay period popup shows; plain data so server pages can hand it to client components. */
+export type PeriodDetail = { period: Period; status: PeriodStatus; scheduled: Scheduled | null; otRate: number; otThreshold: number };
+
+export const periodDetail = (period: Period, today: string, settings: Settings, scheduled: Scheduled | null): PeriodDetail => ({
+  period, status: periodStatus(period, today), scheduled, otRate: settings.otRate, otThreshold: settings.otThreshold,
+});
 
 /* ---------- grouping for the summary tables ---------- */
 

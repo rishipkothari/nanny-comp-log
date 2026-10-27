@@ -226,11 +226,10 @@ button.danger { color: var(--bad); border-color: var(--bad); background: transpa
 .schedcheck { margin: 8px 0 2px; }
 .debugrow { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .debugrow select { padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); }
-.pcard .vals.five { grid-template-columns: repeat(5, 1fr); }
+.pcard .vals.four { grid-template-columns: repeat(4, 1fr); }
 .pcard .vals div > span + span { font-size: 11px; margin-top: 2px; }
 @media (max-width: 480px) {
-  .pcard .vals.five { grid-template-columns: repeat(2, 1fr); row-gap: 10px; }
-  .pcard .vals.five > div:last-child { grid-column: 1 / -1; }
+  .pcard .vals.four { grid-template-columns: repeat(2, 1fr); row-gap: 10px; }
 }
 
 /* pay period detail popup */
@@ -238,10 +237,16 @@ tr.tap { cursor: pointer; }
 tr.tap:hover td { background: var(--accent-soft); }
 dialog.detail { width: min(420px, calc(100vw - 32px)); padding: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--text); }
 dialog.detail::backdrop { background: rgba(0, 0, 0, 0.4); }
+dialog.detail { max-height: calc(100dvh - 32px); }
 dialog.detail .head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; padding: 14px 14px 6px; }
+dialog.detail .headright { display: flex; align-items: flex-start; gap: 8px; }
 dialog.detail .body { padding: 0 14px 6px; }
+dialog.detail h3 { font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); margin: 14px 0 2px; }
 dialog.detail .rowline.total { border-top: 1px solid var(--line); margin-top: 4px; padding-top: 8px; }
-dialog.detail .links { display: flex; justify-content: flex-end; padding: 8px 14px 14px; }
+dialog.detail .rowline.total b { font-weight: 600; }
+dialog.detail .rowline.warn b { color: var(--bad); }
+dialog.detail .links { display: flex; justify-content: flex-end; gap: 16px; padding: 8px 14px 14px; }
+button.linkish { border: 0; background: none; padding: 0; font: inherit; color: var(--accent); cursor: pointer; }
 .pcard .links { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--line); }
 
 /* calendar page: header frozen, events scroll in their own box */
