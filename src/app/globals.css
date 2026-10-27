@@ -226,3 +226,7 @@ button.danger { color: var(--bad); border-color: var(--bad); background: transpa
 .schedcheck { margin: 8px 0 2px; }
 .debugrow { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .debugrow select { padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); }
+.pcard .vals.four { grid-template-columns: repeat(4, 1fr); }
+.pcard .vals.four div > span + span { font-size: 11px; margin-top: 2px; }
+@media (max-width: 480px) { .pcard .vals.four { grid-template-columns: repeat(2, 1fr); row-gap: 10px; } }
+.pcard .links { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--line); }

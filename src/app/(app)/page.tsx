@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { after } from "next/server";
 import PaymentCard from "@/components/PaymentCard";
-import PeriodSummary from "@/components/PeriodSummary";
+import CurrentPeriodCard from "@/components/CurrentPeriodCard";
 import ScheduleDay from "@/components/ScheduleDay";
-import { addDays, buildPeriods, fmtDate, fmtDow, fmtLocalTime, holidayHours, hrs, sickHours, totalHours, vacationHours, workedHours, money, needsAttention, periodStart, periodStatus, todayET, type DayRow, type Period, type PeriodStatus } from "@/lib/calc";
+import { addDays, buildPeriods, fmtDate, fmtDow, fmtLocalTime, holidayHours, hrs, sickHours, totalHours, vacationHours, workedHours, needsAttention, periodStart, periodStatus, todayET, type DayRow, type Period, type PeriodStatus } from "@/lib/calc";
 import { getEventsOn, hasUnsyncedCalendar, listCalendars, syncAll, type DayEvent } from "@/lib/calendar";
 import { getDays, getPayments, getSettings } from "@/lib/db";
 import { getScheduleDays, scheduledTotal } from "@/lib/schedule";
@@ -41,7 +41,8 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ t
   const scheduleByDate = new Map(schedule.map((d) => [d.date, d]));
   const dayByDate = new Map(days.map((d) => [d.date, d]));
   const periodSchedule = schedule.filter((d) => d.date <= addDays(curStart, 6));
-  const planned = scheduledTotal(periodSchedule);
+  const planned = periodSchedule.length ? scheduledTotal(periodSchedule) : null;
+  const periodCard = <CurrentPeriodCard start={curStart} period={current?.period} status={current?.status} planned={planned} admin={admin} />;
 
   return (
     <>
@@ -52,7 +53,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ t
         </div>
       )}
       {showAdmin ? (
-        <AdminTab items={items} curStart={curStart} today={today} venmoHandle={settings.venmoHandle} />
+        <AdminTab items={items} curStart={curStart} today={today} venmoHandle={settings.venmoHandle} periodCard={periodCard} />
       ) : (
         <>
           <TodaySummary days={days} today={today} curStart={curStart} />
@@ -77,25 +78,8 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ t
           </section>
 
           <section className="section">
-            <h2>This pay period · {fmtDate(curStart)} – {fmtDate(addDays(curStart, 6))}</h2>
-            <div className="stats">
-              <div className="stat"><div className="n">{hrs(current?.period.total ?? 0)}</div><div className="k">hours so far</div></div>
-              <div className="stat"><div className="n">{hrs(current?.period.ot ?? 0)}</div><div className="k">overtime hours</div></div>
-              <div className="stat"><div className="n">{money(current?.period.personalDue ?? 0)}</div><div className="k">personal due so far</div></div>
-              <div className="stat">
-                <div className="n">{periodSchedule.length ? hrs(planned.minutes / 60) : "—"}</div>
-                <div className="k">
-                  {periodSchedule.length
-                    ? `scheduled total hours${planned.open ? ` + ${planned.open} day${planned.open === 1 ? "" : "s"} without a total` : ""}`
-                    : "scheduled total hours"}
-                </div>
-              </div>
-            </div>
-            <p className="small">
-              <Link href={`/timesheet?view=period&p=${curStart}`}>Edit this pay period →</Link>
-              {" · "}
-              <Link href="/schedule">{periodSchedule.length ? "See the schedule →" : admin ? "Deduce the schedule →" : "Schedule →"}</Link>
-            </p>
+            <h2>This pay period</h2>
+            {periodCard}
           </section>
         </>
       )}
@@ -148,8 +132,9 @@ function TodaySummary({ days, today, curStart }: { days: DayRow[]; today: string
 
 type Item = { period: Period; status: PeriodStatus };
 
-function AdminTab({ items, curStart, today, venmoHandle }: { items: Item[]; curStart: string; today: string; venmoHandle: string }) {
-  const current = items.find((i) => i.period.start === curStart);
+function AdminTab({ items, curStart, today, venmoHandle, periodCard }: {
+  items: Item[]; curStart: string; today: string; venmoHandle: string; periodCard: React.ReactNode;
+}) {
   const lastStart = addDays(curStart, -7);
   const last = items.find((i) => i.period.start === lastStart);
   const cutoff = monthsAgo(today, 2);
@@ -171,7 +156,7 @@ function AdminTab({ items, curStart, today, venmoHandle }: { items: Item[]; curS
 
       <section className="section">
         <h2>This pay period</h2>
-        {current ? <PeriodSummary period={current.period} status={current.status} /> : <p className="muted small">Nothing recorded yet this pay period.</p>}
+        {periodCard}
       </section>
 
       <section className="section">
