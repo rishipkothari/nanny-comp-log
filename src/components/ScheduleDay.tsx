@@ -7,16 +7,20 @@ const when = (b: Block) =>
 
 /**
  * One deduced day: its blocks, the hour total when every time was written out as the nanny's
- * hours, and (for today or earlier) a button that logs that total.
+ * hours, and (for today or earlier) a button that logs that total. With `detail`, the reasoning
+ * is rendered too, shown only inside a `.verbose` container.
  */
-export default function ScheduleDay({ day, logged, today, detail = false }: { day: Day; logged: DayRow | undefined; today: string; detail?: boolean }) {
+export default function ScheduleDay({ day, logged, today, label = "Schedule", detail = false }: {
+  day: Day; logged: DayRow | undefined; today: string; label?: string; detail?: boolean;
+}) {
   const loggedMinutes = logged ? logged.wh * 60 + logged.wm : 0;
   const canLog = day.total_minutes !== null && day.total_minutes > 0 && day.date <= today && loggedMinutes !== day.total_minutes;
+  const sources = [...new Set(day.blocks.flatMap((b) => b.sources))];
 
   return (
     <div className="sched">
       <div className="schedtop">
-        <span className="schedlabel">Schedule</span>
+        <span className="schedlabel">{label}</span>
         {!day.working ? (
           <span className="muted">Not working</span>
         ) : (
@@ -26,17 +30,16 @@ export default function ScheduleDay({ day, logged, today, detail = false }: { da
             ))}
           </span>
         )}
+        {day.confidence === "low" && <span className="pill conf low">low confidence</span>}
         <span className="schedtotal">
           {!day.working ? "" : day.total_minutes !== null ? `${hrs(day.total_minutes / 60)} h` : "no total"}
         </span>
       </div>
-      {(detail || day.confidence === "low") && (
-        <div className="muted small">
-          {day.confidence !== "high" && <span className={`pill conf ${day.confidence}`}>{day.confidence} confidence</span>} {day.explanation}
+      {detail && (
+        <div className="vdetail muted small">
+          <div><span className={`pill conf ${day.confidence}`}>{day.confidence} confidence</span> {day.explanation}</div>
+          {sources.length > 0 && <div>From: {sources.join(" · ")}</div>}
         </div>
-      )}
-      {detail && day.working && day.blocks.some((b) => b.sources.length) && (
-        <div className="muted small">From: {[...new Set(day.blocks.flatMap((b) => b.sources))].join(" · ")}</div>
       )}
       {canLog && (
         <div className="savebar">

@@ -3,6 +3,7 @@ import { after } from "next/server";
 import CalendarTabs from "@/components/CalendarTabs";
 import ScheduleControls from "@/components/ScheduleControls";
 import ScheduleDay from "@/components/ScheduleDay";
+import VerboseToggle from "@/components/VerboseToggle";
 import { addDays, fmtDate, fmtDateTime, fmtDow, hrs, periodId, periodStart, todayET, workedHours } from "@/lib/calc";
 import { hasUnsyncedCalendar, listCalendars, syncAll } from "@/lib/calendar";
 import { getDayRange, getSettings } from "@/lib/db";
@@ -48,24 +49,6 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
         </div>
       </div>
 
-      {admin ? (
-        <ScheduleControls
-          key={start}
-          start={start}
-          calendars={calendars.filter((c) => c.enabled).map((c) => ({ id: c.id, label: c.label, color: c.color, is_schedule: c.is_schedule }))}
-          hints={settings.scheduleHints}
-          model={settings.scheduleModel}
-          effort={settings.scheduleEffort}
-          hasKey={hasApiKey()}
-          hasRun={days.length > 0}
-        />
-      ) : (
-        <p className="muted small">
-          Schedule calendars: {scheduleCals.length ? scheduleCals.map((c) => c.label).join(", ") : "none"}.{" "}
-          <Link href="/admin?next=/schedule">Unlock admin mode</Link> to deduce the schedule.
-        </p>
-      )}
-
       {days.length === 0 ? (
         <p className="muted">No schedule deduced for this pay period yet.</p>
       ) : (
@@ -78,23 +61,53 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
             <div className="stat"><div className="n">{hrs(loggedWorked)}</div><div className="k">worked hours logged</div></div>
             <div className="stat"><div className="n">{total.working}</div><div className="k">working days</div></div>
           </div>
-          <p className="muted small">
-            Deduced {fmtDateTime(lastRun)}{usedModels ? ` with ${usedModels}` : ""}. Times marked ~ come from other events or were assumed, so those days get no hour total.
-          </p>
-          {Array.from({ length: 7 }, (_, i) => addDays(start, i)).map((date) => {
-            const day = byDate.get(date);
-            return (
-              <section key={date} className="agday">
-                <h2>
-                  {fmtDow(date)} {fmtDate(date)}
-                  {date === today && <span className="pill">Today</span>}
-                </h2>
-                {day ? <ScheduleDay day={day} logged={loggedByDate.get(date)} today={today} detail /> : <p className="muted small">Not deduced.</p>}
-              </section>
-            );
-          })}
+          <VerboseToggle>
+            <p className="vdetail muted small">Times marked ~ come from other events or were assumed, so those days get no hour total.</p>
+            {Array.from({ length: 7 }, (_, i) => addDays(start, i)).map((date) => {
+              const day = byDate.get(date);
+              const label = `${fmtDow(date)} ${fmtDate(date).replace(/\/\d{4}$/, "")}${date === today ? " · Today" : ""}`;
+              return day ? (
+                <ScheduleDay key={date} label={label} day={day} logged={loggedByDate.get(date)} today={today} detail />
+              ) : (
+                <div key={date} className="sched">
+                  <div className="schedtop"><span className="schedlabel">{label}</span><span className="muted">Not deduced</span></div>
+                </div>
+              );
+            })}
+          </VerboseToggle>
         </>
       )}
+
+      <details className="card deducebox" open={admin && days.length === 0}>
+        <summary>
+          <strong>Deduce &amp; settings</strong>
+          <span className="sub">{days.length ? `Last run ${fmtDateTime(lastRun)}` : "Not run yet"}</span>
+        </summary>
+        <div className="body">
+          {days.length > 0 && (
+            <p className="muted small">
+              Deduced {fmtDateTime(lastRun)}{usedModels ? ` with ${usedModels}` : ""}.
+            </p>
+          )}
+          {admin ? (
+            <ScheduleControls
+              key={start}
+              start={start}
+              calendars={calendars.filter((c) => c.enabled).map((c) => ({ id: c.id, label: c.label, color: c.color, is_schedule: c.is_schedule }))}
+              hints={settings.scheduleHints}
+              model={settings.scheduleModel}
+              effort={settings.scheduleEffort}
+              hasKey={hasApiKey()}
+              hasRun={days.length > 0}
+            />
+          ) : (
+            <p className="muted small">
+              Schedule calendars: {scheduleCals.length ? scheduleCals.map((c) => c.label).join(", ") : "none"}.{" "}
+              <Link href="/admin?next=/schedule">Unlock admin mode</Link> to deduce the schedule.
+            </p>
+          )}
+        </div>
+      </details>
     </>
   );
 }

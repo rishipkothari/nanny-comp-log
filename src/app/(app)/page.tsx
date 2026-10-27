@@ -59,14 +59,37 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ t
           <TodaySummary days={days} today={today} curStart={curStart} />
 
           <section className="section">
-            <h2>Next 3 days</h2>
+            <h2>This pay period</h2>
+            {periodCard}
+          </section>
+
+          <section className="section">
+            <h2>Schedule · next 3 days</h2>
+            {schedule.length === 0 ? (
+              <p className="muted small">
+                No schedule deduced yet. <Link href="/schedule">{admin ? "Deduce it →" : "Schedule →"}</Link>
+              </p>
+            ) : (
+              upcoming.map((date, i) =>
+                scheduleByDate.has(date) ? (
+                  <ScheduleDay key={date} label={dayLabel(date, i)} day={scheduleByDate.get(date)!} logged={dayByDate.get(date)} today={today} />
+                ) : (
+                  <div key={date} className="sched">
+                    <div className="schedtop"><span className="schedlabel">{dayLabel(date, i)}</span><span className="muted">Not deduced</span></div>
+                  </div>
+                ),
+              )
+            )}
+          </section>
+
+          <section className="section">
+            <h2>Calendar · next 3 days</h2>
             {calendars.length === 0 ? (
               <p className="muted small">No calendars connected. <Link href="/settings">Add one in settings.</Link></p>
             ) : (
               upcoming.map((date, i) => (
                 <div key={date} className="agday">
-                  <h3 className="dayhead">{i === 0 ? "Today" : i === 1 ? "Tomorrow" : fmtDow(date)} · {fmtDate(date)}</h3>
-                  {scheduleByDate.has(date) && <ScheduleDay day={scheduleByDate.get(date)!} logged={dayByDate.get(date)} today={today} />}
+                  <h3 className="dayhead">{dayLabel(date, i)}</h3>
                   {eventsByDay[i].length > 0 ? (
                     eventsByDay[i].map((e) => <Event key={e.id} e={e} />)
                   ) : (
@@ -76,16 +99,13 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ t
               ))
             )}
           </section>
-
-          <section className="section">
-            <h2>This pay period</h2>
-            {periodCard}
-          </section>
         </>
       )}
     </>
   );
 }
+
+const dayLabel = (date: string, i: number) => `${i === 0 ? "Today" : i === 1 ? "Tomorrow" : fmtDow(date)} · ${fmtDate(date)}`;
 
 /** Hours logged today, or a reminder to log them, plus any weekdays earlier this pay period left blank. */
 function TodaySummary({ days, today, curStart }: { days: DayRow[]; today: string; curStart: string }) {

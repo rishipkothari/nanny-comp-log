@@ -16,7 +16,7 @@ export default async function CalendarPage() {
   const [calendars, events] = await Promise.all([listCalendars(), getAllEvents()]);
 
   return (
-    <>
+    <div className="calpage">
       <CalendarTabs on="calendar" />
       <CalendarView
         calendars={calendars.filter((c) => c.enabled).map((c) => ({ id: c.id, label: c.label, color: c.color }))}
@@ -25,6 +25,6 @@ export default async function CalendarPage() {
         from={addDays(today, -WINDOW_BACK_DAYS)}
         to={addDays(today, WINDOW_AHEAD_DAYS)}
       />
-    </>
+    </div>
   );
 }

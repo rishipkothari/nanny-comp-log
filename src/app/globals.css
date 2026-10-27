@@ -230,3 +230,22 @@ button.danger { color: var(--bad); border-color: var(--bad); background: transpa
 .pcard .vals.four div > span + span { font-size: 11px; margin-top: 2px; }
 @media (max-width: 480px) { .pcard .vals.four { grid-template-columns: repeat(2, 1fr); row-gap: 10px; } }
 .pcard .links { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--line); }
+
+/* calendar page: header frozen, events scroll in their own box */
+main:has(.calpage) { padding-bottom: 12px; }
+.calpage { display: flex; flex-direction: column; height: calc(100dvh - 52px - 12px - 12px); }
+.calpage > * { flex: 0 0 auto; }
+.calpage > .calscroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; position: relative;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--bg); padding: 10px 10px 4px; }
+.calpage .seg { margin-bottom: 10px; }
+.calpast { margin: 0 0 10px; }
+.calscroll .agday:last-child { margin-bottom: 6px; }
+
+/* schedule page */
+.verbosebox { margin: 4px 0 10px; }
+.vdetail { display: none; }
+.verbose .vdetail { display: block; }
+.sched .vdetail { margin-top: 4px; }
+.sched .vdetail > div + div { margin-top: 2px; }
+.deducebox { margin-top: 16px; }
+.deducebox .schedctl { margin-bottom: 0; }
