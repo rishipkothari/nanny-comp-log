@@ -25,7 +25,7 @@ export type ScheduleDay = {
   created_at: string;
 };
 
-const MODEL = "claude-opus-5-5";
+const MODEL = "claude-haiku-5-5";
 /** Bump when the prompt or schema changes so cached days are re-deduced. */
 const PROMPT_VERSION = 1;
 const BASES: Basis[] = ["stated", "event", "assumed"];
@@ -223,11 +223,9 @@ function cleanDay(raw: RawDay, titles: Map<number, string>): Omit<ScheduleDay, "
 
 async function askClaude(input: unknown): Promise<RawDay[]> {
   const client = new Anthropic();
-  const res = await client.beta.messages.create({
+  const res = await client.messages.create({
     model: MODEL,
     max_tokens: 16000,
-    betas: ["server-side-fallback-2026-07-01"],
-    fallbacks: "default",
     output_config: { effort: "medium", format: { type: "json_schema", schema: OUTPUT_SCHEMA } },
     system: SYSTEM,
     messages: [{ role: "user", content: JSON.stringify(input, null, 1) }],
