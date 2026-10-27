@@ -166,21 +166,22 @@ export type PeriodStatus = { open: boolean; approved: boolean; balanced: boolean
 
 /**
  * One definition of status for the whole app. A closed period carries two independent badges:
- * whether its hours are approved, and whether personal pay made equals personal pay due (balanced).
+ * whether its hours are approved, and whether it is balanced: Homepay paid for any hours,
+ * and personal pay made equal to personal pay due.
  */
 export function periodStatus(
-  p: { end: string; personalDue: number; personalPaid: number; approved: boolean },
+  p: { end: string; total: number; homepayNet: number; personalDue: number; personalPaid: number; approved: boolean },
   today: string,
 ): PeriodStatus {
   const outstanding = p.personalDue - p.personalPaid;
-  const balanced = Math.abs(outstanding) < 0.005;
+  const personalBalanced = Math.abs(outstanding) < 0.005;
+  const homepayMissing = p.total > 0 && p.homepayNet <= 0;
+  const balanced = personalBalanced && !homepayMissing;
   if (p.end >= today) return { open: true, approved: p.approved, balanced, outstanding, badges: [{ label: "open", tone: "neutral" }] };
-  const badges: Badge[] = [
-    p.approved ? { label: "hours approved", tone: "ok" } : { label: "hours not approved", tone: "warn" },
-    balanced
-      ? { label: "balanced", tone: "ok" }
-      : { label: outstanding > 0 ? `${money(outstanding)} owed` : `${money(-outstanding)} over`, tone: "warn" },
-  ];
+  const badges: Badge[] = [p.approved ? { label: "hours approved", tone: "ok" } : { label: "hours not approved", tone: "warn" }];
+  if (homepayMissing) badges.push({ label: "homepay not paid", tone: "warn" });
+  if (!personalBalanced) badges.push({ label: outstanding > 0 ? `${money(outstanding)} owed` : `${money(-outstanding)} over`, tone: "warn" });
+  if (balanced) badges.push({ label: "balanced", tone: "ok" });
   return { open: false, approved: p.approved, balanced, outstanding, badges };
 }
 

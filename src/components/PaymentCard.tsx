@@ -47,7 +47,10 @@ export default function PaymentCard({ period, editable, today, venmoHandle, defa
 
   const net = Number(f.homepay_net) || 0;
   const paid = Number(f.personal_paid) || 0;
-  const status = periodStatus({ end: period.end, personalDue: period.personalDue, personalPaid: paid, approved: f.approved }, today);
+  const status = periodStatus(
+    { end: period.end, total: period.total, homepayNet: net, personalDue: period.personalDue, personalPaid: paid, approved: f.approved },
+    today,
+  );
   const outstanding = status.outstanding;
   const canVenmo = editable && !!venmoHandle && outstanding > 0.005 && (f.route === "" || f.route === "Venmo");
 

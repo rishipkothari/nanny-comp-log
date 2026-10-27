@@ -1,10 +1,12 @@
 import Link from "next/link";
+import PeriodHoursTable, { type PeriodDetail } from "@/components/PeriodHoursTable";
 import SummaryChart, { type Point, type SeriesDef } from "@/components/SummaryChart";
 import {
-  GROUPS, buildPeriods, fmtDate, holidayHours, hoursRows, hrs, money, paymentsRows, sickHours, todayET, vacationHours, workedHours,
-  type Group,
+  GROUPS, buildPeriods, fmtDate, holidayHours, hoursRows, hrs, money, paymentsRows, periodStart, sickHours, todayET, vacationHours, workedHours,
+  type Group, type Period,
 } from "@/lib/calc";
 import { getDays, getPayments, getSettings } from "@/lib/db";
+import { getScheduleDays, scheduledTotal } from "@/lib/schedule";
 
 export const dynamic = "force-dynamic";
 
@@ -56,7 +58,13 @@ export default async function Summary({ searchParams }: { searchParams: Promise<
               <Link key={g.key} href={href({ g: g.key })} className={g.key === group ? "chip on" : "chip"}>{g.label}</Link>
             ))}
           </div>
-          {mode === "hours" ? <HoursTable rows={hoursRows(days, periods, group, today)} group={group} /> : <PaymentsTable rows={paymentsRows(periods, group, today)} />}
+          {mode === "payments" ? (
+            <PaymentsTable rows={paymentsRows(periods, group, today)} />
+          ) : group === "period" ? (
+            <PeriodHoursTable rows={await periodDetails(periods)} />
+          ) : (
+            <HoursTable rows={hoursRows(days, periods, group, today)} group={group} />
+          )}
           {group !== "period" && (
             <p className="muted small">
               {mode === "hours"
@@ -99,15 +107,34 @@ export default async function Summary({ searchParams }: { searchParams: Promise<
   );
 }
 
+/** Each pay period's totals plus what the deduced schedule adds up to for it. */
+async function periodDetails(periods: Period[]): Promise<PeriodDetail[]> {
+  if (!periods.length) return [];
+  const schedule = await getScheduleDays(periods[periods.length - 1].start, periods[0].end);
+  const byStart = new Map<string, typeof schedule>();
+  for (const d of schedule) {
+    const start = periodStart(d.date);
+    byStart.set(start, [...(byStart.get(start) ?? []), d]);
+  }
+  return periods.map((p) => {
+    const days = byStart.get(p.start);
+    return {
+      id: p.id, start: p.start, end: p.end,
+      working: p.worked, vacation: p.vacation, sick: p.sick, holiday: p.holiday, total: p.total, ot: p.ot,
+      stipend: p.stipend, expenses: p.expenses,
+      scheduled: days ? scheduledTotal(days) : null,
+    };
+  });
+}
+
 function HoursTable({ rows, group }: { rows: ReturnType<typeof hoursRows>; group: Group }) {
   return (
     <div className="tablewrap">
       <table>
         <thead>
           <tr>
-            <th>{group === "period" ? "Pay period" : group === "month" ? "Month" : "Year"}</th>
+            <th>{group === "month" ? "Month" : "Year"}</th>
             <th>Working</th><th>Vacation</th><th>Sick</th><th>Holiday</th><th>Total</th>
-            {group === "period" && <th>OT</th>}
           </tr>
         </thead>
         <tbody>
@@ -116,7 +143,6 @@ function HoursTable({ rows, group }: { rows: ReturnType<typeof hoursRows>; group
               <td>{r.label}</td>
               <td>{hrs(r.working)}</td><td>{hrs(r.vacation)}</td><td>{hrs(r.sick)}</td><td>{hrs(r.holiday)}</td>
               <td><b>{hrs(r.total)}</b></td>
-              {group === "period" && <td className={r.ot ? "ot" : ""}>{hrs(r.ot ?? 0)}</td>}
             </tr>
           ))}
         </tbody>

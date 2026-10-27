@@ -4,7 +4,7 @@ import StatusBadges from "./StatusBadges";
 
 type Planned = { minutes: number; open: number } | null;
 
-/** The current pay period in one card: hours, overtime, personal pay due and the scheduled total. */
+/** The current pay period in one card: hours, the scheduled total, expenses, stipend and personal pay due. */
 export default function CurrentPeriodCard({ start, period, status, planned, admin }: {
   start: string; period: Period | undefined; status: PeriodStatus | undefined; planned: Planned; admin: boolean;
 }) {
@@ -17,15 +17,16 @@ export default function CurrentPeriodCard({ start, period, status, planned, admi
         </div>
         {status && <StatusBadges status={status} />}
       </div>
-      <div className="vals four">
+      <div className="vals five">
         <div><span>Hours so far</span>{hrs(period?.total ?? 0)}</div>
-        <div><span>Overtime</span>{hrs(period?.ot ?? 0)}</div>
-        <div><span>Personal due</span><b>{money(period?.personalDue ?? 0)}</b></div>
         <div>
           <span>Scheduled</span>
           {planned ? hrs(planned.minutes / 60) : "—"}
           {planned && planned.open > 0 && <span>+ {planned.open} day{planned.open === 1 ? "" : "s"} without a total</span>}
         </div>
+        <div><span>Expenses</span>{money(period?.expenses ?? 0)}</div>
+        <div><span>Stipend</span>{money(period?.stipend ?? 0)}</div>
+        <div><span>Personal due</span><b>{money(period?.personalDue ?? 0)}</b></div>
       </div>
       <div className="small links">
         <Link href={`/timesheet?view=period&p=${start}`}>Edit hours →</Link>
