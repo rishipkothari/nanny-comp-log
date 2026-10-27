@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import Anthropic from "@anthropic-ai/sdk";
-import { addDays, fmtDow, totalHours, vacationHours, sickHours, holidayHours, workedHours } from "./calc";
+import { addDays, fmtDow, type ScheduleEffort, type ScheduleModel, totalHours, vacationHours, sickHours, holidayHours, workedHours } from "./calc";
 import { ensureSchema as ensureCalendarSchema, getScheduleEvents, type DayEvent } from "./calendar";
 import { getDayRange, getSettings, sql } from "./db";
 
@@ -23,9 +23,10 @@ export type ScheduleDay = {
   confidence: "high" | "medium" | "low";
   explanation: string;
   created_at: string;
+  /** DEBUG: which model and effort produced this day. */
+  model: string;
 };
 
-const MODEL = "claude-haiku-5-5";
 /** Bump when the prompt or schema changes so cached days are re-deduced. */
 const PROMPT_VERSION = 1;
 const BASES: Basis[] = ["stated", "event", "assumed"];
@@ -50,6 +51,7 @@ function ensureSchema(): Promise<void> {
       input_hash text NOT NULL,
       created_at timestamptz NOT NULL DEFAULT now()
     )`;
+    await sql`ALTER TABLE schedule_days ADD COLUMN IF NOT EXISTS model text NOT NULL DEFAULT ''`;
   })().catch((e) => {
     schemaReady = null;
     throw e;
@@ -61,7 +63,7 @@ type Stored = ScheduleDay & { input_hash: string };
 
 async function readDays(from: string, to: string): Promise<Stored[]> {
   await ensureSchema();
-  const rows = await sql`SELECT date::text AS date, working, blocks, total_minutes, confidence, explanation, input_hash,
+  const rows = await sql`SELECT date::text AS date, working, blocks, total_minutes, confidence, explanation, input_hash, model,
     to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at
     FROM schedule_days WHERE date BETWEEN ${from} AND ${to} ORDER BY date`;
   return rows.map((r) => ({
@@ -73,6 +75,7 @@ async function readDays(from: string, to: string): Promise<Stored[]> {
     explanation: r.explanation as string,
     created_at: r.created_at as string,
     input_hash: r.input_hash as string,
+    model: r.model as string,
   }));
 }
 
@@ -104,10 +107,10 @@ function describe(e: DayEvent) {
     : { id: e.id, all_day: false, start: `${e.start.slice(0, 10)} ${hhmm(e.start)}`, end: `${e.end.slice(0, 10)} ${hhmm(e.end)}`, title: e.title, location: e.location || undefined, calendar: e.calendar };
 }
 
-/** A day's cache key: its own events, the household notes, and the prompt version. */
-function dayHash(date: string, events: DayEvent[], hints: string): string {
+/** A day's cache key: its own events, the household notes, the model settings, and the prompt version. */
+function dayHash(date: string, events: DayEvent[], hints: string, model: string): string {
   const mine = events.filter((e) => coveredDays(e).includes(date)).map((e) => [e.title, e.location, e.all_day, e.start, e.end]);
-  return createHash("sha256").update(JSON.stringify([PROMPT_VERSION, MODEL, hints, mine])).digest("hex");
+  return createHash("sha256").update(JSON.stringify([PROMPT_VERSION, model, hints, mine])).digest("hex");
 }
 
 /* ---------- the model call ---------- */
@@ -183,7 +186,7 @@ const fromMinutes = (v: number) => `${String(Math.floor(v / 60)).padStart(2, "0"
 const weaker = (a: Basis, b: Basis): Basis => (BASES.indexOf(a) > BASES.indexOf(b) ? a : b);
 
 /** Checks the model's blocks: valid times, start before end, sorted, overlaps merged. */
-function cleanDay(raw: RawDay, titles: Map<number, string>): Omit<ScheduleDay, "created_at"> {
+function cleanDay(raw: RawDay, titles: Map<number, string>): Omit<ScheduleDay, "created_at" | "model"> {
   const blocks: (Block & { s: number; e: number })[] = [];
   for (const b of raw.blocks ?? []) {
     const s = toMinutes(b.start);
@@ -221,12 +224,15 @@ function cleanDay(raw: RawDay, titles: Map<number, string>): Omit<ScheduleDay, "
   };
 }
 
-async function askClaude(input: unknown): Promise<RawDay[]> {
+async function askClaude(input: unknown, model: ScheduleModel, effort: ScheduleEffort): Promise<RawDay[]> {
   const client = new Anthropic();
-  const res = await client.messages.create({
-    model: MODEL,
+  // Opus and Sonnet re-run a declined request on another model; Haiku ignores the setting.
+  const res = await client.beta.messages.create({
+    model,
     max_tokens: 16000,
-    output_config: { effort: "medium", format: { type: "json_schema", schema: OUTPUT_SCHEMA } },
+    betas: ["server-side-fallback-2026-07-01"],
+    fallbacks: "default",
+    output_config: { effort, format: { type: "json_schema", schema: OUTPUT_SCHEMA } },
     system: SYSTEM,
     messages: [{ role: "user", content: JSON.stringify(input, null, 1) }],
   });
@@ -256,7 +262,8 @@ export async function deduceSchedule(start: string, force: boolean): Promise<Ded
   const targets = Array.from({ length: 7 }, (_, i) => addDays(start, i));
 
   const [events, logged, settings, stored] = await Promise.all([getScheduleEvents(from, to), getDayRange(from, to), getSettings(), readDays(start, end)]);
-  const hashes = new Map(targets.map((d) => [d, dayHash(d, events, settings.scheduleHints)]));
+  const modelTag = `${settings.scheduleModel}/${settings.scheduleEffort}`;
+  const hashes = new Map(targets.map((d) => [d, dayHash(d, events, settings.scheduleHints, modelTag)]));
   const storedByDate = new Map(stored.map((d) => [d.date, d]));
   if (!force && targets.every((d) => storedByDate.get(d)?.input_hash === hashes.get(d))) {
     return { days: stored.map(({ input_hash: _, ...d }) => d), cached: true };
@@ -280,20 +287,20 @@ export async function deduceSchedule(start: string, force: boolean): Promise<Ded
     weekdays: Object.fromEntries(dates.map((d) => [d, fmtDow(d)])),
   };
 
-  const raw = await askClaude(input);
+  const raw = await askClaude(input, settings.scheduleModel, settings.scheduleEffort);
   const titles = new Map(events.map((e) => [e.id, e.title]));
   const byDate = new Map(raw.filter((d) => hashes.has(d.date)).map((d) => [d.date, cleanDay(d, titles)]));
-  const days = targets.map(
+  const days: Omit<ScheduleDay, "created_at" | "model">[] = targets.map(
     (date) =>
       byDate.get(date) ?? { date, working: false, blocks: [], total_minutes: 0, confidence: "low" as const, explanation: "No answer was returned for this day." },
   );
 
   await sql.transaction(
     days.map(
-      (d) => sql`INSERT INTO schedule_days (date, working, blocks, total_minutes, confidence, explanation, input_hash, created_at)
-        VALUES (${d.date}, ${d.working}, ${JSON.stringify(d.blocks)}::jsonb, ${d.total_minutes}, ${d.confidence}, ${d.explanation}, ${hashes.get(d.date)!}, now())
+      (d) => sql`INSERT INTO schedule_days (date, working, blocks, total_minutes, confidence, explanation, input_hash, model, created_at)
+        VALUES (${d.date}, ${d.working}, ${JSON.stringify(d.blocks)}::jsonb, ${d.total_minutes}, ${d.confidence}, ${d.explanation}, ${hashes.get(d.date)!}, ${modelTag}, now())
         ON CONFLICT (date) DO UPDATE SET working = EXCLUDED.working, blocks = EXCLUDED.blocks, total_minutes = EXCLUDED.total_minutes,
-          confidence = EXCLUDED.confidence, explanation = EXCLUDED.explanation, input_hash = EXCLUDED.input_hash, created_at = now()`,
+          confidence = EXCLUDED.confidence, explanation = EXCLUDED.explanation, input_hash = EXCLUDED.input_hash, model = EXCLUDED.model, created_at = now()`,
     ),
   );
   return { days: await getScheduleDays(start, end), cached: false };

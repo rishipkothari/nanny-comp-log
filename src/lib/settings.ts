@@ -1,4 +1,4 @@
-import type { Settings } from "./calc";
+import { SCHEDULE_EFFORTS, SCHEDULE_MODELS, type ScheduleEffort, type ScheduleModel, type Settings } from "./calc";
 
 /**
  * Settings live in a key/value table (value is jsonb), so a new setting is one entry here
@@ -21,11 +21,15 @@ const handle = (v: unknown) => {
 /** Free text handed to schedule deduction as notes about how the calendar is written. */
 const notes = (v: unknown) => (typeof v === "string" ? v.slice(0, 2000) : undefined);
 
+const oneOf = <T extends string>(allowed: readonly T[]) => (v: unknown) => (allowed.includes(v as T) ? (v as T) : undefined);
+
 export const SETTING_DEFS: Defs = {
   otRate: { key: "ot_rate", parse: nonNegative },
   otThreshold: { key: "ot_threshold", parse: nonNegative },
   venmoHandle: { key: "venmo_handle", parse: handle },
   scheduleHints: { key: "schedule_hints", parse: notes },
+  scheduleModel: { key: "schedule_model", parse: oneOf<ScheduleModel>(SCHEDULE_MODELS.map((m) => m.id)) },
+  scheduleEffort: { key: "schedule_effort", parse: oneOf<ScheduleEffort>(SCHEDULE_EFFORTS) },
 };
 
 export const SETTING_FIELDS = Object.keys(SETTING_DEFS) as (keyof Settings)[];

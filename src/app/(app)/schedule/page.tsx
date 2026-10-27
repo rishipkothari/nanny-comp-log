@@ -30,6 +30,7 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
   const total = scheduledTotal(days);
   const loggedWorked = logged.reduce((n, d) => n + workedHours(d), 0);
   const lastRun = days.reduce((t, d) => (d.created_at > t ? d.created_at : t), "");
+  const usedModels = [...new Set(days.map((d) => d.model).filter(Boolean))].join(", ");
   const scheduleCals = calendars.filter((c) => c.is_schedule);
 
   return (
@@ -53,6 +54,8 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
           start={start}
           calendars={calendars.filter((c) => c.enabled).map((c) => ({ id: c.id, label: c.label, color: c.color, is_schedule: c.is_schedule }))}
           hints={settings.scheduleHints}
+          model={settings.scheduleModel}
+          effort={settings.scheduleEffort}
           hasKey={hasApiKey()}
           hasRun={days.length > 0}
         />
@@ -76,7 +79,7 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
             <div className="stat"><div className="n">{total.working}</div><div className="k">working days</div></div>
           </div>
           <p className="muted small">
-            Deduced {fmtDateTime(lastRun)}. Times marked ~ come from other events or were assumed, so those days get no hour total.
+            Deduced {fmtDateTime(lastRun)}{usedModels ? ` with ${usedModels}` : ""}. Times marked ~ come from other events or were assumed, so those days get no hour total.
           </p>
           {Array.from({ length: 7 }, (_, i) => addDays(start, i)).map((date) => {
             const day = byDate.get(date);

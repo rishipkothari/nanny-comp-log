@@ -224,3 +224,5 @@ button.danger { color: var(--bad); border-color: var(--bad); background: transpa
 .schedctl textarea.notes { width: 100%; font: inherit; color: var(--text); padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); resize: vertical; }
 .schedctl .savebar { margin-top: 6px; }
 .schedcheck { margin: 8px 0 2px; }
+.debugrow { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.debugrow select { padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); }

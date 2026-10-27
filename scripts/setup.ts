@@ -80,6 +80,7 @@ await sql`CREATE TABLE IF NOT EXISTS schedule_days (
   input_hash text NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now()
 )`;
+await sql`ALTER TABLE schedule_days ADD COLUMN IF NOT EXISTS model text NOT NULL DEFAULT ''`;
 await sql`CREATE INDEX IF NOT EXISTS calendar_events_start ON calendar_events (start_at)`;
 await sql`CREATE INDEX IF NOT EXISTS calendar_events_calendar ON calendar_events (calendar_id)`;
 

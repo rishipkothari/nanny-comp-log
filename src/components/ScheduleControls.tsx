@@ -2,21 +2,29 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { SCHEDULE_EFFORTS, SCHEDULE_MODELS, type ScheduleEffort, type ScheduleModel } from "@/lib/calc";
 import { useSaver } from "@/lib/useSaver";
 import SaveStatus from "./SaveStatus";
 
 type Cal = { id: number; label: string; color: string; is_schedule: boolean };
 
 /** Admin-only: which calendars hold the schedule, notes on how they are written, and the deduce button. */
-export default function ScheduleControls({ start, calendars, hints, hasKey, hasRun }: {
-  start: string; calendars: Cal[]; hints: string; hasKey: boolean; hasRun: boolean;
+export default function ScheduleControls({ start, calendars, hints, model, effort, hasKey, hasRun }: {
+  start: string; calendars: Cal[]; hints: string; model: ScheduleModel; effort: ScheduleEffort; hasKey: boolean; hasRun: boolean;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ text: string; tone: "err" | "muted" } | null>(null);
   const [cachedHit, setCachedHit] = useState(false);
   const [notes, setNotes] = useState(hints);
-  const { statuses, queue, flush } = useSaver<{ scheduleHints: string }>("/api/settings");
+  const [ai, setAi] = useState({ scheduleModel: model, scheduleEffort: effort });
+  const { statuses, queue, flush } = useSaver<{ scheduleHints?: string; scheduleModel?: ScheduleModel; scheduleEffort?: ScheduleEffort }>("/api/settings");
+  const pickAi = (p: Partial<typeof ai>) => {
+    const next = { ...ai, ...p };
+    setAi(next);
+    queue("ai", next);
+    flush("ai");
+  };
   const tagged = calendars.filter((c) => c.is_schedule).length;
 
   async function toggle(c: Cal) {
@@ -35,6 +43,7 @@ export default function ScheduleControls({ start, calendars, hints, hasKey, hasR
 
   async function deduce(force: boolean) {
     flush("hints");
+    flush("ai");
     setBusy("deduce");
     setMsg(null);
     setCachedHit(false);
@@ -85,6 +94,18 @@ export default function ScheduleControls({ start, calendars, hints, hasKey, hasR
         onBlur={() => flush("hints")}
       />
       <div className="savebar"><SaveStatus status={statuses.hints} /></div>
+
+      {/* DEBUG: model and effort switch, to be removed once the prompt is tuned. */}
+      <h3 className="h3">Model (debug)</h3>
+      <div className="debugrow">
+        <select aria-label="Model" value={ai.scheduleModel} onChange={(e) => pickAi({ scheduleModel: e.target.value as ScheduleModel })}>
+          {SCHEDULE_MODELS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+        </select>
+        <select aria-label="Effort" value={ai.scheduleEffort} onChange={(e) => pickAi({ scheduleEffort: e.target.value as ScheduleEffort })}>
+          {SCHEDULE_EFFORTS.map((x) => <option key={x} value={x}>{x} effort</option>)}
+        </select>
+        <SaveStatus status={statuses.ai} compact />
+      </div>
 
       <div className="savebar">
         <button className="primary" disabled={busy !== null || !hasKey || tagged === 0} onClick={() => deduce(false)}>

@@ -1,8 +1,22 @@
 const DAY = 86400000;
 
-export type Settings = { otRate: number; otThreshold: number; venmoHandle: string; scheduleHints: string };
+/** DEBUG: model and effort for schedule deduction are switchable from the Schedule page while it is tuned. */
+export const SCHEDULE_MODELS = [
+  { id: "claude-haiku-5-5", label: "Haiku 5.5" },
+  { id: "claude-sonnet-5-5", label: "Sonnet 5.5" },
+  { id: "claude-opus-5-5", label: "Opus 5.5" },
+] as const;
+export const SCHEDULE_EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const;
+export type ScheduleModel = (typeof SCHEDULE_MODELS)[number]["id"];
+export type ScheduleEffort = (typeof SCHEDULE_EFFORTS)[number];
+
+export type Settings = {
+  otRate: number; otThreshold: number; venmoHandle: string; scheduleHints: string;
+  scheduleModel: ScheduleModel; scheduleEffort: ScheduleEffort;
+};
 export const DEFAULT_SETTINGS: Settings = {
   otRate: 28, otThreshold: 40, venmoHandle: "anat-sweeney",
+  scheduleModel: "claude-haiku-5-5", scheduleEffort: "medium",
   scheduleHints: 'All-day events whose title starts with "AS" give the nanny\'s working hours for that day, e.g. "AS 8-5:30" or "AS 7:30-12, 3-6".',
 };
 
