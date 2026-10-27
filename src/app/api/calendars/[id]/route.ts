@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { normalizeUrl, syncCalendar } from "@/lib/calendar";
+import { ensureSchema, normalizeUrl, syncCalendar } from "@/lib/calendar";
 import { sql } from "@/lib/db";
 import { requireAdmin } from "@/lib/session";
 
@@ -19,6 +19,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     await sql`UPDATE calendars SET label = ${label} WHERE id = ${id}`;
   }
   if (typeof b.color === "string" && COLOR.test(b.color)) await sql`UPDATE calendars SET color = ${b.color} WHERE id = ${id}`;
+  if (typeof b.is_schedule === "boolean") {
+    await ensureSchema();
+    await sql`UPDATE calendars SET is_schedule = ${b.is_schedule} WHERE id = ${id}`;
+  }
   if (typeof b.enabled === "boolean") {
     await sql`UPDATE calendars SET enabled = ${b.enabled} WHERE id = ${id}`;
     if (b.enabled) await syncCalendar(id);

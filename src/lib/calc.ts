@@ -1,7 +1,24 @@
 const DAY = 86400000;
 
-export type Settings = { otRate: number; otThreshold: number; venmoHandle: string };
-export const DEFAULT_SETTINGS: Settings = { otRate: 28, otThreshold: 40, venmoHandle: "anat-sweeney" };
+/** DEBUG: model and effort for schedule deduction are switchable from the Schedule page while it is tuned. */
+export const SCHEDULE_MODELS = [
+  { id: "claude-haiku-5-5", label: "Haiku 5.5" },
+  { id: "claude-sonnet-5-5", label: "Sonnet 5.5" },
+  { id: "claude-opus-5-5", label: "Opus 5.5" },
+] as const;
+export const SCHEDULE_EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const;
+export type ScheduleModel = (typeof SCHEDULE_MODELS)[number]["id"];
+export type ScheduleEffort = (typeof SCHEDULE_EFFORTS)[number];
+
+export type Settings = {
+  otRate: number; otThreshold: number; venmoHandle: string; scheduleHints: string;
+  scheduleModel: ScheduleModel; scheduleEffort: ScheduleEffort;
+};
+export const DEFAULT_SETTINGS: Settings = {
+  otRate: 28, otThreshold: 40, venmoHandle: "anat-sweeney",
+  scheduleModel: "claude-haiku-5-5", scheduleEffort: "medium",
+  scheduleHints: 'All-day events whose title starts with "AS" give the nanny\'s working hours for that day, e.g. "AS 8-5:30" or "AS 7:30-12, 3-6".',
+};
 
 function parse(s: string): number {
   const [y, m, d] = s.split("-").map(Number);
@@ -270,8 +287,13 @@ export function fmtTime(iso: string): string {
 
 /** "9:30 AM" from a local wall-clock string ("2026-10-26T09:30:00"); no zone conversion happens. */
 export function fmtLocalTime(local: string): string {
-  const h = Number(local.slice(11, 13));
-  return `${h % 12 || 12}:${local.slice(14, 16)} ${h < 12 ? "AM" : "PM"}`;
+  return fmtClock(local.slice(11, 16));
+}
+
+/** "9:30 AM" from "09:30" ("24:00" is midnight at the end of the day). */
+export function fmtClock(hhmm: string): string {
+  const h = Number(hhmm.slice(0, 2));
+  return `${h % 12 || 12}:${hhmm.slice(3, 5)} ${h < 12 || h === 24 ? "AM" : "PM"}`;
 }
 
 export function fmtDow(s: string): string {

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { addDays, fmtDate, fmtDow, fmtLocalTime } from "@/lib/calc";
 import type { DayEvent } from "@/lib/calendar";
 
@@ -64,6 +64,8 @@ export default function CalendarView({ calendars, events, today, from, to }: Pro
     return map;
   }, [events, hidden, from, to]);
 
+  const hasPast = [...byDay.keys()].some((d) => d < today);
+
   const toggle = (id: number) =>
     setHidden((h) => {
       const next = new Set(h);
@@ -99,33 +101,46 @@ export default function CalendarView({ calendars, events, today, from, to }: Pro
         <button className={view === "month" ? "on" : ""} aria-pressed={view === "month"} onClick={() => setView("month")}>Month</button>
       </div>
 
-      {view === "agenda" ? (
-        <Agenda byDay={byDay} today={today} from={from} to={to} showPast={showPast} setShowPast={setShowPast} />
-      ) : (
-        <Month
-          byDay={byDay} today={today} from={from} to={to} month={month} setMonth={setMonth} picked={picked} setPicked={setPicked}
-        />
+      {view === "agenda" && hasPast && (
+        <p className="calpast">
+          <button className="small" onClick={() => setShowPast(!showPast)}>{showPast ? "Hide earlier events" : "Show earlier events"}</button>
+        </p>
       )}
+
+      {/* Everything above stays put; only this box scrolls. */}
+      <div className="calscroll" key={view}>
+        {view === "agenda" ? (
+          <Agenda byDay={byDay} today={today} from={from} to={to} showPast={showPast} />
+        ) : (
+          <Month
+            byDay={byDay} today={today} from={from} to={to} month={month} setMonth={setMonth} picked={picked} setPicked={setPicked}
+          />
+        )}
+      </div>
     </>
   );
 }
 
-function Agenda({ byDay, today, from, to, showPast, setShowPast }: {
-  byDay: Map<string, Item[]>; today: string; from: string; to: string; showPast: boolean; setShowPast: (v: boolean) => void;
+function Agenda({ byDay, today, from, to, showPast }: {
+  byDay: Map<string, Item[]>; today: string; from: string; to: string; showPast: boolean;
 }) {
   const days = [...byDay.keys()].filter((d) => d >= (showPast ? from : today) && d <= to).sort();
-  const hasPast = [...byDay.keys()].some((d) => d < today);
+  const first = useRef<HTMLDivElement>(null);
+
+  // Revealing earlier events keeps today at the top of the box; scroll up to see them.
+  useLayoutEffect(() => {
+    const box = first.current?.parentElement;
+    if (!box) return;
+    const todayEl = box.querySelector<HTMLElement>("[data-today]");
+    box.scrollTop = showPast && todayEl ? todayEl.offsetTop : 0;
+  }, [showPast]);
 
   return (
     <>
-      {hasPast && (
-        <p>
-          <button className="small" onClick={() => setShowPast(!showPast)}>{showPast ? "Hide earlier events" : "Show earlier events"}</button>
-        </p>
-      )}
+      <div ref={first} hidden />
       {days.length === 0 && <p className="muted">Nothing scheduled.</p>}
       {days.map((d) => (
-        <section key={d} className="agday">
+        <section key={d} className="agday" data-today={d === today || undefined}>
           <h2>
             {fmtDow(d)} {fmtDate(d)}
             {d === today && <span className="pill">Today</span>}

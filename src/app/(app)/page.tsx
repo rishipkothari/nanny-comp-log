@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { after } from "next/server";
 import PaymentCard from "@/components/PaymentCard";
-import PeriodSummary from "@/components/PeriodSummary";
-import { addDays, buildPeriods, fmtDate, fmtDow, fmtLocalTime, holidayHours, hrs, sickHours, totalHours, vacationHours, workedHours, money, needsAttention, periodStart, periodStatus, todayET, type DayRow, type Period, type PeriodStatus } from "@/lib/calc";
+import CurrentPeriodCard from "@/components/CurrentPeriodCard";
+import ScheduleDay from "@/components/ScheduleDay";
+import { addDays, buildPeriods, fmtDate, fmtDow, fmtLocalTime, holidayHours, hrs, sickHours, totalHours, vacationHours, workedHours, needsAttention, periodStart, periodStatus, todayET, type DayRow, type Period, type PeriodStatus } from "@/lib/calc";
 import { getEventsOn, hasUnsyncedCalendar, listCalendars, syncAll, type DayEvent } from "@/lib/calendar";
 import { getDays, getPayments, getSettings } from "@/lib/db";
+import { getScheduleDays, scheduledTotal } from "@/lib/schedule";
 import { isAdmin } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -25,15 +27,22 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ t
   else after(() => syncAll(true));
 
   const upcoming = [today, addDays(today, 1), addDays(today, 2)];
-  const [days, payments, settings, calendars, admin, ...eventsByDay] = await Promise.all([
-    getDays(), getPayments(), getSettings(), listCalendars(), isAdmin(), ...upcoming.map(getEventsOn),
+  const curStart = periodStart(today);
+  const [days, payments, settings, calendars, admin, schedule, ...eventsByDay] = await Promise.all([
+    getDays(), getPayments(), getSettings(), listCalendars(), isAdmin(),
+    // the current pay period plus anything of the next 3 days that spills into the next one
+    getScheduleDays(curStart, addDays(curStart, 13)), ...upcoming.map(getEventsOn),
   ]);
   const periods = buildPeriods(days, payments, settings);
   const items = periods.map((period) => ({ period, status: periodStatus(period, today) }));
 
-  const curStart = periodStart(today);
   const current = items.find((i) => i.period.start === curStart);
   const showAdmin = admin && tab === "admin";
+  const scheduleByDate = new Map(schedule.map((d) => [d.date, d]));
+  const dayByDate = new Map(days.map((d) => [d.date, d]));
+  const periodSchedule = schedule.filter((d) => d.date <= addDays(curStart, 6));
+  const planned = periodSchedule.length ? scheduledTotal(periodSchedule) : null;
+  const periodCard = <CurrentPeriodCard start={curStart} period={current?.period} status={current?.status} planned={planned} admin={admin} />;
 
   return (
     <>
@@ -44,19 +53,43 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ t
         </div>
       )}
       {showAdmin ? (
-        <AdminTab items={items} curStart={curStart} today={today} venmoHandle={settings.venmoHandle} />
+        <AdminTab items={items} curStart={curStart} today={today} venmoHandle={settings.venmoHandle} periodCard={periodCard} />
       ) : (
         <>
           <TodaySummary days={days} today={today} curStart={curStart} />
 
           <section className="section">
-            <h2>Next 3 days</h2>
+            <h2>This pay period</h2>
+            {periodCard}
+          </section>
+
+          <section className="section">
+            <h2>Schedule · next 3 days</h2>
+            {schedule.length === 0 ? (
+              <p className="muted small">
+                No schedule deduced yet. <Link href="/schedule">{admin ? "Deduce it →" : "Schedule →"}</Link>
+              </p>
+            ) : (
+              upcoming.map((date, i) =>
+                scheduleByDate.has(date) ? (
+                  <ScheduleDay key={date} label={dayLabel(date, i)} day={scheduleByDate.get(date)!} logged={dayByDate.get(date)} today={today} />
+                ) : (
+                  <div key={date} className="sched">
+                    <div className="schedtop"><span className="schedlabel">{dayLabel(date, i)}</span><span className="muted">Not deduced</span></div>
+                  </div>
+                ),
+              )
+            )}
+          </section>
+
+          <section className="section">
+            <h2>Calendar · next 3 days</h2>
             {calendars.length === 0 ? (
               <p className="muted small">No calendars connected. <Link href="/settings">Add one in settings.</Link></p>
             ) : (
               upcoming.map((date, i) => (
                 <div key={date} className="agday">
-                  <h3 className="dayhead">{i === 0 ? "Today" : i === 1 ? "Tomorrow" : fmtDow(date)} · {fmtDate(date)}</h3>
+                  <h3 className="dayhead">{dayLabel(date, i)}</h3>
                   {eventsByDay[i].length > 0 ? (
                     eventsByDay[i].map((e) => <Event key={e.id} e={e} />)
                   ) : (
@@ -66,21 +99,13 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ t
               ))
             )}
           </section>
-
-          <section className="section">
-            <h2>This pay period · {fmtDate(curStart)} – {fmtDate(addDays(curStart, 6))}</h2>
-            <div className="stats">
-              <div className="stat"><div className="n">{hrs(current?.period.total ?? 0)}</div><div className="k">hours so far</div></div>
-              <div className="stat"><div className="n">{hrs(current?.period.ot ?? 0)}</div><div className="k">overtime hours</div></div>
-              <div className="stat"><div className="n">{money(current?.period.personalDue ?? 0)}</div><div className="k">personal due so far</div></div>
-            </div>
-            <p className="small"><Link href={`/timesheet?view=period&p=${curStart}`}>Edit this pay period →</Link></p>
-          </section>
         </>
       )}
     </>
   );
 }
+
+const dayLabel = (date: string, i: number) => `${i === 0 ? "Today" : i === 1 ? "Tomorrow" : fmtDow(date)} · ${fmtDate(date)}`;
 
 /** Hours logged today, or a reminder to log them, plus any weekdays earlier this pay period left blank. */
 function TodaySummary({ days, today, curStart }: { days: DayRow[]; today: string; curStart: string }) {
@@ -127,8 +152,9 @@ function TodaySummary({ days, today, curStart }: { days: DayRow[]; today: string
 
 type Item = { period: Period; status: PeriodStatus };
 
-function AdminTab({ items, curStart, today, venmoHandle }: { items: Item[]; curStart: string; today: string; venmoHandle: string }) {
-  const current = items.find((i) => i.period.start === curStart);
+function AdminTab({ items, curStart, today, venmoHandle, periodCard }: {
+  items: Item[]; curStart: string; today: string; venmoHandle: string; periodCard: React.ReactNode;
+}) {
   const lastStart = addDays(curStart, -7);
   const last = items.find((i) => i.period.start === lastStart);
   const cutoff = monthsAgo(today, 2);
@@ -150,7 +176,7 @@ function AdminTab({ items, curStart, today, venmoHandle }: { items: Item[]; curS
 
       <section className="section">
         <h2>This pay period</h2>
-        {current ? <PeriodSummary period={current.period} status={current.status} /> : <p className="muted small">Nothing recorded yet this pay period.</p>}
+        {periodCard}
       </section>
 
       <section className="section">
