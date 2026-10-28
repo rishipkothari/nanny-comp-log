@@ -1,12 +1,13 @@
 import Link from "next/link";
-import { DetailTable } from "@/components/PeriodDetail";
 import SummaryChart, { type Point, type SeriesDef } from "@/components/SummaryChart";
+import { HoursTable, PaymentLog, PaymentsTable } from "@/components/SummaryTables";
 import {
-  GROUPS, buildPeriods, fmtDate, holidayHours, hoursRows, hrs, money, paymentsRows, periodDetail, sickHours, todayET, vacationHours, workedHours,
+  GROUPS, buildPeriods, fmtDate, holidayHours, hoursRows, paymentsRows, periodDetail, sickHours, todayET, vacationHours, workedHours,
   type Group, type PeriodDetail,
 } from "@/lib/calc";
 import { getDays, getPayments, getSettings } from "@/lib/db";
 import { scheduledByPeriod } from "@/lib/schedule";
+import { isAdmin } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
@@ -25,26 +26,26 @@ const PAY_SERIES: SeriesDef[] = [
 
 type Params = { m?: string; v?: string; g?: string };
 
-export default async function Summary({ searchParams }: { searchParams: Promise<Params> }) {
+export default async function Reports({ searchParams }: { searchParams: Promise<Params> }) {
   const sp = await searchParams;
   const mode = sp.m === "payments" ? "payments" : "hours";
   const view = sp.v === "chart" ? "chart" : "table";
   const group: Group = GROUPS.some((g) => g.key === sp.g) ? (sp.g as Group) : "period";
   const today = todayET();
 
-  const [days, payments, settings] = await Promise.all([getDays(), getPayments(), getSettings()]);
+  const [days, payments, settings, admin] = await Promise.all([getDays(), getPayments(), getSettings(), isAdmin()]);
   const periods = buildPeriods(days, payments, settings);
 
-  // pay-period rows open the period's popup
+  // pay-period hours rows open the period's popup (payment rows open the payment popup)
   let details = new Map<string, PeriodDetail>();
-  if (view === "table" && group === "period" && periods.length) {
+  if (mode === "hours" && view === "table" && group === "period" && periods.length) {
     const scheduled = await scheduledByPeriod(periods[periods.length - 1].start, periods[0].end);
     details = new Map(periods.map((p) => [p.start, periodDetail(p, today, settings, scheduled.get(p.start) ?? null)]));
   }
 
   const href = (over: Params) => {
     const q = new URLSearchParams({ m: mode, v: view, g: group, ...over } as Record<string, string>);
-    return `/summary?${q.toString()}`;
+    return `/reports?${q.toString()}`;
   };
 
   return (
@@ -67,7 +68,9 @@ export default async function Summary({ searchParams }: { searchParams: Promise<
           </div>
           {mode === "hours"
             ? <HoursTable rows={hoursRows(days, periods, group, today)} group={group} details={details} />
-            : <PaymentsTable rows={paymentsRows(periods, group, today)} details={details} />}
+            : group === "period"
+              ? <PaymentLog periods={periods} editable={admin} today={today} venmoHandle={settings.venmoHandle} />
+              : <PaymentsTable rows={paymentsRows(periods, group, today)} />}
           {group !== "period" && (
             <p className="muted small">
               {mode === "hours"
@@ -107,55 +110,5 @@ export default async function Summary({ searchParams }: { searchParams: Promise<
         />
       )}
     </>
-  );
-}
-
-function HoursTable({ rows, group, details }: { rows: ReturnType<typeof hoursRows>; group: Group; details: Map<string, PeriodDetail> }) {
-  return (
-    <DetailTable
-      head={
-        <tr>
-          <th>{group === "period" ? "Pay period" : group === "month" ? "Month" : "Year"}</th>
-          <th>Working</th><th>Vacation</th><th>Sick</th><th>Holiday</th><th>Total</th>
-          {group === "period" && <th>OT</th>}
-        </tr>
-      }
-      rows={rows.map((r) => ({
-        key: r.key,
-        detail: details.get(r.key),
-        cells: (
-          <>
-            <td>{r.label}</td>
-            <td>{hrs(r.working)}</td><td>{hrs(r.vacation)}</td><td>{hrs(r.sick)}</td><td>{hrs(r.holiday)}</td>
-            <td><b>{hrs(r.total)}</b></td>
-            {group === "period" && <td className={r.ot ? "ot" : ""}>{hrs(r.ot ?? 0)}</td>}
-          </>
-        ),
-      }))}
-    />
-  );
-}
-
-function PaymentsTable({ rows, details }: { rows: ReturnType<typeof paymentsRows>; details: Map<string, PeriodDetail> }) {
-  return (
-    <DetailTable
-      head={
-        <tr>
-          <th>Period</th><th>Homepay net</th><th>Personal due</th><th>Personal paid</th><th>Owed</th><th>Total paid</th>
-        </tr>
-      }
-      rows={rows.map((r) => ({
-        key: r.key,
-        detail: details.get(r.key),
-        cells: (
-          <>
-            <td>{r.label}</td>
-            <td>{money(r.homepay)}</td><td>{money(r.due)}</td><td>{money(r.paid)}</td>
-            <td className={Math.abs(r.owed) >= 0.005 ? "ot" : ""}>{money(r.owed)}</td>
-            <td><b>{money(r.totalPaid)}</b></td>
-          </>
-        ),
-      }))}
-    />
   );
 }

@@ -58,8 +58,8 @@ input, select { font: inherit; color: var(--text); }
 .tabs a { padding: 10px 2px; color: var(--muted); border-bottom: 2px solid transparent; }
 .tabs a.on { color: var(--text); border-color: var(--accent); }
 .seg { display: grid; grid-template-columns: 1fr 1fr; background: var(--accent-soft); border-radius: 10px; padding: 3px; margin-bottom: 12px; }
-.seg a { text-align: center; padding: 9px 0; border-radius: 8px; color: var(--muted); font-weight: 500; }
-.seg a.on { background: var(--card); color: var(--text); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12); }
+.seg a, .seg button { text-align: center; padding: 9px 0; border: 0; border-radius: 8px; background: transparent; color: var(--muted); font-weight: 500; }
+.seg a.on, .seg button.on { background: var(--card); color: var(--text); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12); }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
 .chip { padding: 6px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--card); color: var(--text); font-size: 14px; }
 .chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
@@ -102,6 +102,9 @@ th:first-child, td:first-child { text-align: left; }
 th { color: var(--muted); font-weight: 500; font-size: 13px; }
 tbody tr:last-child td { border-bottom: 0; }
 td.ot { color: var(--accent); font-weight: 600; }
+tr.rowlink td { padding: 0; }
+tr.rowlink td > a { display: block; padding: 9px 12px; color: inherit; }
+tr.rowlink:hover td { background: var(--accent-soft); }
 
 /* pay period grid */
 .grid table { min-width: 860px; }
@@ -189,11 +192,6 @@ button.danger { color: var(--bad); border-color: var(--bad); background: transpa
 .chip { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 5px 12px; font-size: 14px; color: var(--muted); }
 .chip.on { color: var(--text); background: var(--accent-soft); }
 .chip .dot { width: 10px; height: 10px; border-radius: 50%; border: 2px solid; display: inline-block; }
-.seg { display: flex; margin-bottom: 14px; }
-.seg button { flex: 1; border-radius: 0; }
-.seg button:first-child { border-radius: 8px 0 0 8px; }
-.seg button:last-child { border-radius: 0 8px 8px 0; border-left: 0; }
-.seg button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 .agday { margin-bottom: 14px; }
 .agday > h2 { font-size: 13px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); margin: 0 0 6px; display: flex; align-items: center; gap: 8px; }
 .agday > .dayhead { font-size: 14px; font-weight: 600; margin: 0 0 6px; }

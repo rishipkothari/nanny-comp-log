@@ -209,7 +209,7 @@ export const GROUPS: { key: Group; label: string }[] = [
 ];
 
 export type HoursRow = { key: string; label: string; working: number; vacation: number; sick: number; holiday: number; total: number; ot: number | null };
-export type PaymentsRow = { key: string; label: string; homepay: number; due: number; paid: number; owed: number; totalPaid: number };
+export type PaymentsRow = { key: string; label: string; hours: number; earnings: number; homepay: number; due: number; paid: number; owed: number; totalPaid: number };
 
 const monthLabel = (ym: string) =>
   new Date(parse(`${ym}-01`)).toLocaleString("en-US", { month: "short", year: "numeric", timeZone: "UTC" });
@@ -255,9 +255,11 @@ export function paymentsRows(periods: Period[], group: Group, today: string): Pa
     let r = map.get(key);
     if (!r) {
       const label = group === "period" ? periodLabel(p) : group === "month" ? monthLabel(key) : group === "year" ? key : `${key} to date`;
-      r = { key, label, homepay: 0, due: 0, paid: 0, owed: 0, totalPaid: 0 };
+      r = { key, label, hours: 0, earnings: 0, homepay: 0, due: 0, paid: 0, owed: 0, totalPaid: 0 };
       map.set(key, r);
     }
+    r.hours += p.total;
+    r.earnings += p.payment?.homepay_earnings ?? 0;
     r.homepay += p.homepayNet;
     r.due += p.personalDue;
     r.paid += p.personalPaid;
