@@ -166,25 +166,37 @@ export type PeriodStatus = { open: boolean; approved: boolean; balanced: boolean
 
 /**
  * One definition of status for the whole app. A closed period carries two independent badges:
- * whether its hours are approved, and whether personal pay made equals personal pay due (balanced).
+ * whether its hours are approved, and whether it is balanced: Homepay paid for any hours,
+ * and personal pay made equal to personal pay due.
  */
 export function periodStatus(
-  p: { end: string; personalDue: number; personalPaid: number; approved: boolean },
+  p: { end: string; total: number; homepayNet: number; personalDue: number; personalPaid: number; approved: boolean },
   today: string,
 ): PeriodStatus {
   const outstanding = p.personalDue - p.personalPaid;
-  const balanced = Math.abs(outstanding) < 0.005;
+  const personalBalanced = Math.abs(outstanding) < 0.005;
+  const homepayMissing = p.total > 0 && p.homepayNet <= 0;
+  const balanced = personalBalanced && !homepayMissing;
   if (p.end >= today) return { open: true, approved: p.approved, balanced, outstanding, badges: [{ label: "open", tone: "neutral" }] };
   const badges: Badge[] = [
     p.approved ? { label: "hours approved", tone: "ok" } : { label: "hours not approved", tone: "warn" },
-    balanced
-      ? { label: "balanced", tone: "ok" }
-      : { label: outstanding > 0 ? `${money(outstanding)} owed` : `${money(-outstanding)} over`, tone: "warn" },
+    balanced ? { label: "balanced", tone: "ok" } : { label: "unbalanced", tone: "warn" },
   ];
   return { open: false, approved: p.approved, balanced, outstanding, badges };
 }
 
 export const needsAttention = (s: PeriodStatus) => !s.open && (!s.approved || !s.balanced);
+
+/* ---------- pay period detail ---------- */
+
+export type Scheduled = { minutes: number; open: number };
+
+/** Everything the pay period popup shows; plain data so server pages can hand it to client components. */
+export type PeriodDetail = { period: Period; status: PeriodStatus; scheduled: Scheduled | null; otRate: number; otThreshold: number };
+
+export const periodDetail = (period: Period, today: string, settings: Settings, scheduled: Scheduled | null): PeriodDetail => ({
+  period, status: periodStatus(period, today), scheduled, otRate: settings.otRate, otThreshold: settings.otThreshold,
+});
 
 /* ---------- grouping for the summary tables ---------- */
 

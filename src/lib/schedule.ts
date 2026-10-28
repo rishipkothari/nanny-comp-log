@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import Anthropic from "@anthropic-ai/sdk";
-import { addDays, fmtDow, type ScheduleEffort, type ScheduleModel, totalHours, vacationHours, sickHours, holidayHours, workedHours } from "./calc";
+import { addDays, fmtDow, periodStart, type Scheduled, type ScheduleEffort, type ScheduleModel, totalHours, vacationHours, sickHours, holidayHours, workedHours } from "./calc";
 import { ensureSchema as ensureCalendarSchema, getScheduleEvents, type DayEvent } from "./calendar";
 import { getDayRange, getSettings, sql } from "./db";
 
@@ -328,4 +328,14 @@ export function scheduledTotal(days: ScheduleDay[]): { minutes: number; open: nu
     else minutes += d.total_minutes;
   }
   return { minutes, open, working: days.filter((d) => d.working).length };
+}
+
+/** Scheduled totals for every pay period with deduced days between from and to, keyed by period start. */
+export async function scheduledByPeriod(from: string, to: string): Promise<Map<string, Scheduled>> {
+  const byStart = new Map<string, ScheduleDay[]>();
+  for (const d of await getScheduleDays(from, to)) {
+    const start = periodStart(d.date);
+    byStart.set(start, [...(byStart.get(start) ?? []), d]);
+  }
+  return new Map([...byStart].map(([start, days]) => [start, scheduledTotal(days)]));
 }

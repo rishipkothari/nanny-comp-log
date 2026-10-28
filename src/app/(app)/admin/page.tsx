@@ -23,7 +23,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
           <p className="muted">Enter the admin password to edit payments and settings.</p>
           {error && <div className="err">Wrong admin password.</div>}
           <form method="post" action="/api/admin/login" className="adminform">
-            <input type="hidden" name="next" value={safeNext(next, "/payments")} />
+            <input type="hidden" name="next" value={safeNext(next, "/?tab=admin")} />
             <PasswordInput placeholder="Admin password" />
             <button className="primary" type="submit" style={{ width: "100%" }}>
               Unlock
