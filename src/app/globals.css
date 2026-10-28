@@ -56,7 +56,7 @@ input, select { font: inherit; color: var(--text); }
 .tabs a { padding: 10px 2px; color: var(--muted); border-bottom: 2px solid transparent; }
 .tabs a.on { color: var(--text); border-color: var(--accent); }
 .seg { display: grid; grid-template-columns: 1fr 1fr; background: var(--accent-soft); border-radius: 10px; padding: 3px; margin-bottom: 12px; }
-.seg a { text-align: center; padding: 9px 0; border-radius: 8px; color: var(--muted); font-weight: 500; }
+.seg a { flex: 1; text-align: center; padding: 9px 0; border-radius: 8px; color: var(--muted); font-weight: 500; }
 .seg a.on { background: var(--card); color: var(--text); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12); }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
 .chip { padding: 6px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--card); color: var(--text); font-size: 14px; }
