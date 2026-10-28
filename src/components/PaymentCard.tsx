@@ -185,9 +185,16 @@ function PaymentForm({ period, pay, editable, today, venmoHandle }: Props & { pa
     </div>
   );
 
+  /** Worked out from hours and other fields, so never editable. */
+  const calc = (label: string, value: string) => (
+    <div className="field calc">
+      <label>{label}</label>
+      <span className="ro">{value}</span>
+    </div>
+  );
+
   return (
     <div className="body">
-      <div className="rowline"><span>Personal comp due</span><b>{money(period.personalDue)}</b></div>
       <div className="field">
         <label htmlFor={`ap-${key}`}>Hours approved</label>
         <div className="approval">
@@ -204,6 +211,7 @@ function PaymentForm({ period, pay, editable, today, venmoHandle }: Props & { pa
       {num("homepay_earnings", "Homepay earnings")}
       {num("homepay_net", "Homepay net paid")}
       {date("homepay_date", "Homepay paid date")}
+      {calc("Personal comp due", money(period.personalDue))}
       {num("personal_paid", "Personal comp paid")}
       {date("personal_date", "Personal paid date")}
       <div className="field">
@@ -225,7 +233,7 @@ function PaymentForm({ period, pay, editable, today, venmoHandle }: Props & { pa
           <span className="ro">{f.notes || "—"}</span>
         )}
       </div>
-      <div className="rowline"><span>Total paid</span><b>{money(net + paid)}</b></div>
+      {calc("Total paid", money(net + paid))}
       {editable && (
         <div className="savebar">
           <button onClick={copy}>{copied ? "Copied" : "Copy Venmo note"}</button>

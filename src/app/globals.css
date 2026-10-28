@@ -254,6 +254,7 @@ dialog.detail .links { display: flex; justify-content: flex-end; gap: 16px; padd
 .paylog table { min-width: 1200px; }
 .paylog td, .paylog th { white-space: nowrap; }
 .paylog td.l, .paylog th.l { text-align: left; white-space: normal; min-width: 140px; }
+.field.calc .ro { font-weight: 600; }
 button.linkish { border: 0; background: none; padding: 0; font: inherit; color: var(--accent); cursor: pointer; }
 .pcard .links { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--line); }
 
