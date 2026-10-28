@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { hrs, money, type Group, type HoursRow, type PaymentsRow } from "@/lib/calc";
+import StatusBadges from "./StatusBadges";
+import { fmtDate, hrs, money, type Group, type HoursRow, type PaymentsRow } from "@/lib/calc";
 
 /** A row whose cells all link to `href`, so the whole row is clickable. */
 function Cells({ href, cells }: { href?: string; cells: [React.ReactNode, string?][] }) {
@@ -39,27 +40,43 @@ export function HoursTable({ rows, group, href }: { rows: HoursRow[]; group: Gro
   );
 }
 
+const day = (d: string | null) => (d ? fmtDate(d) : "—");
+
+/** Pay periods show every payment detail and status badges; month and year rollups show the sums. */
 export function PaymentsTable({ rows, href }: { rows: PaymentsRow[]; href?: (r: PaymentsRow) => string }) {
+  const detail = rows.some((r) => r.detail);
   return (
     <div className="tablewrap">
-      <table>
+      <table className="paytable">
         <thead>
           <tr>
-            <th>Period</th><th>Homepay net</th><th>Personal due</th><th>Personal paid</th><th>Owed</th><th>Total paid</th>
+            <th>Period</th>
+            {detail && <th className="l">Status</th>}
+            <th>Hours</th><th>Personal due</th><th>Personal paid</th>
+            {detail && <><th>Paid on</th><th className="l">Route</th></>}
+            <th>Owed</th><th>Homepay earnings</th><th>Homepay net</th>
+            {detail && <th>Homepay on</th>}
+            <th>Total paid</th>
+            {detail && <th>Notes</th>}
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) => (
-            <tr key={r.key} className={href ? "rowlink" : undefined}>
-              <Cells
-                href={href?.(r)}
-                cells={[
-                  [r.label], [money(r.homepay)], [money(r.due)], [money(r.paid)],
-                  [money(r.owed), Math.abs(r.owed) >= 0.005 ? "ot" : ""], [<b key="t">{money(r.totalPaid)}</b>],
-                ]}
-              />
-            </tr>
-          ))}
+          {rows.map((r) => {
+            const d = r.detail;
+            const cells: [React.ReactNode, string?][] = [[r.label]];
+            if (detail) cells.push([d ? <StatusBadges key="s" status={d.status} /> : null, "status l"]);
+            cells.push([hrs(r.hours)], [money(r.due)], [money(r.paid)]);
+            if (detail) cells.push([day(d?.personalDate ?? null)], [d?.route || "—", "l"]);
+            cells.push([money(r.owed), Math.abs(r.owed) >= 0.005 ? "ot" : ""], [money(r.earnings)], [money(r.homepay)]);
+            if (detail) cells.push([day(d?.homepayDate ?? null)]);
+            cells.push([<b key="t">{money(r.totalPaid)}</b>]);
+            if (detail) cells.push([d?.notes || "—", "notes"]);
+            return (
+              <tr key={r.key} className={href ? "rowlink" : undefined}>
+                <Cells href={href?.(r)} cells={cells} />
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

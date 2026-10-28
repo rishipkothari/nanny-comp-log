@@ -100,6 +100,10 @@ th:first-child, td:first-child { text-align: left; }
 th { color: var(--muted); font-weight: 500; font-size: 13px; }
 tbody tr:last-child td { border-bottom: 0; }
 td.ot { color: var(--accent); font-weight: 600; }
+.paytable .l, .paytable th:last-child, .paytable td.notes { text-align: left; }
+.paytable td.status .badges { justify-content: flex-start; flex-wrap: nowrap; }
+.paytable th:first-child, .paytable td:first-child { position: sticky; left: 0; background: var(--card); z-index: 1; }
+.paytable td.notes { white-space: normal; min-width: 180px; }
 tr.rowlink td { padding: 0; }
 tr.rowlink td > a { display: block; padding: 9px 12px; color: inherit; }
 tr.rowlink:hover td { background: var(--accent-soft); }
