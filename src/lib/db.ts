@@ -37,13 +37,13 @@ export async function getDays(): Promise<DayRow[]> {
 }
 
 export async function getPayments(): Promise<PaymentRow[]> {
-  const rows = await sql`SELECT period_start::text AS period_start, homepay_earnings, homepay_net, homepay_date::text AS homepay_date, personal_paid, personal_date::text AS personal_date, route, notes, approved,
+  const rows = await sql`SELECT period_start::text AS period_start, regular_due, regular_paid, regular_date::text AS regular_date, personal_paid, personal_date::text AS personal_date, route, notes, approved,
     to_char(approved_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS approved_at FROM payments`;
   return rows.map((r) => ({
     period_start: r.period_start as string,
-    homepay_earnings: r.homepay_earnings == null ? null : Number(r.homepay_earnings),
-    homepay_net: r.homepay_net == null ? null : Number(r.homepay_net),
-    homepay_date: (r.homepay_date as string) ?? null,
+    regular_due: r.regular_due == null ? null : Number(r.regular_due),
+    regular_paid: r.regular_paid == null ? null : Number(r.regular_paid),
+    regular_date: (r.regular_date as string) ?? null,
     personal_paid: r.personal_paid == null ? null : Number(r.personal_paid),
     personal_date: (r.personal_date as string) ?? null,
     route: (r.route as string) ?? null,

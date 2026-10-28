@@ -19,9 +19,9 @@ const HOUR_SERIES: SeriesDef[] = [
 ];
 const PAY_SERIES: SeriesDef[] = [
   { key: "total", label: "Total paid", color: "#d9822b", on: true },
-  { key: "homepay", label: "Homepay net", color: "#2f7fd6", on: true },
-  { key: "personal", label: "Personal comp paid", color: "#8e44e0", on: true },
-  { key: "due", label: "Personal comp due", color: "#6b7686", on: false },
+  { key: "regular", label: "Regular paid", color: "#2f7fd6", on: true },
+  { key: "personal", label: "Personal paid", color: "#8e44e0", on: true },
+  { key: "due", label: "Personal due", color: "#6b7686", on: false },
 ];
 
 type Params = { m?: string; v?: string; g?: string };
@@ -105,7 +105,7 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
           periods={[...periods].reverse().map<Point>((p) => ({
             date: p.end,
             label: fmtDate(p.end).replace(/\/\d{4}$/, ""),
-            values: { total: p.totalPaid, homepay: p.homepayNet, personal: p.personalPaid, due: p.personalDue },
+            values: { total: p.totalPaid, regular: p.regularPaid, personal: p.personalPaid, due: p.personalDue },
           }))}
         />
       )}

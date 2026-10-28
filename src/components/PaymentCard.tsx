@@ -16,9 +16,9 @@ type Props = { period: Period; editable: boolean; today: string; venmoHandle: st
 function usePayment(period: Period, today: string) {
   const p = period.payment;
   const [f, setF] = useState({
-    homepay_earnings: p?.homepay_earnings?.toString() ?? "",
-    homepay_net: p?.homepay_net?.toString() ?? "",
-    homepay_date: p?.homepay_date ?? "",
+    regular_due: p?.regular_due?.toString() ?? "",
+    regular_paid: p?.regular_paid?.toString() ?? "",
+    regular_date: p?.regular_date ?? "",
     personal_paid: p?.personal_paid?.toString() ?? "",
     personal_date: p?.personal_date ?? "",
     route: p?.route ?? "",
@@ -40,19 +40,20 @@ function usePayment(period: Period, today: string) {
   };
   const blur = () => flush(key);
   const clear = () => {
-    const blank = { homepay_earnings: "", homepay_net: "", homepay_date: "", personal_paid: "", personal_date: "", route: "", notes: "", approved: false };
+    const blank = { regular_due: "", regular_paid: "", regular_date: "", personal_paid: "", personal_date: "", route: "", notes: "", approved: false };
     setF(blank);
     queue(key, { period_start: period.start, ...blank });
     flush(key);
   };
 
-  const net = Number(f.homepay_net) || 0;
+  const regularDue = Number(f.regular_due) || 0;
+  const net = Number(f.regular_paid) || 0;
   const paid = Number(f.personal_paid) || 0;
   const status = periodStatus(
-    { end: period.end, total: period.total, homepayNet: net, personalDue: period.personalDue, personalPaid: paid, approved: f.approved },
+    { end: period.end, total: period.total, regularDue, regularPaid: net, personalDue: period.personalDue, personalPaid: paid, approved: f.approved },
     today,
   );
-  return { f, set, blur, clear, approvedAt, saveStatus: statuses[key], net, paid, status };
+  return { f, set, blur, clear, approvedAt, saveStatus: statuses[key], regularDue, net, paid, status };
 }
 
 type Payment = ReturnType<typeof usePayment>;
@@ -62,6 +63,9 @@ export default function PaymentCard({ period, editable, today, venmoHandle, defa
   const pay = usePayment(period, today);
   const [open, setOpen] = useState(defaultOpen);
   const ref = useRef<HTMLDivElement>(null);
+  // only what is still owed (or overpaid) shows; settled amounts are left off
+  const owedText = (label: string, n: number) => Math.abs(n) >= 0.005 && `${label} ${n > 0 ? "owed" : "overpaid"} ${money(Math.abs(n))}`;
+  const owed = [owedText("regular", pay.regularDue - pay.net), owedText("personal", pay.status.outstanding)].filter(Boolean).join(" · ");
 
   useEffect(() => {
     if (defaultOpen) ref.current?.scrollIntoView({ block: "start" });
@@ -73,7 +77,8 @@ export default function PaymentCard({ period, editable, today, venmoHandle, defa
         <div className="paytop">
           <div>
             <div>{fmtDate(period.start)} – {fmtDate(period.end)}</div>
-            <div className="sub">{hrs(period.total)} h · personal due {money(period.personalDue)}</div>
+            <div className="sub">{hrs(period.total)} h · regular due {money(pay.regularDue)} · personal due {money(period.personalDue)}</div>
+            {owed && <div className="sub ot">{owed}</div>}
           </div>
           <div style={{ textAlign: "right" }}>
             <div>{money(pay.net + pay.paid)}</div>
@@ -89,12 +94,18 @@ export default function PaymentCard({ period, editable, today, venmoHandle, defa
   );
 }
 
+/** An amount still owed (negative when overpaid), highlighted unless settled. */
+export function OwedCell({ n }: { n: number }) {
+  return <td className={Math.abs(n) >= 0.005 ? "ot" : ""}>{money(n)}</td>;
+}
+
 /** One row of the payments log; tapping it opens the payment popup. */
 export function PaymentTableRow({ period, editable, today, venmoHandle }: Props) {
   const pay = usePayment(period, today);
   const [open, setOpen] = useState(false);
   const { f, status } = pay;
   const owed = status.outstanding;
+  const regularOwed = pay.regularDue - pay.net;
   const amount = (v: string) => (v === "" ? "—" : money(Number(v)));
 
   return (
@@ -103,14 +114,16 @@ export function PaymentTableRow({ period, editable, today, venmoHandle }: Props)
       <td><StatusBadges status={status} /></td>
       <td>{f.approved ? "Yes" : "No"}</td>
       <td>{hrs(period.total)}</td>
-      <td>{amount(f.homepay_earnings)}</td>
-      <td>{amount(f.homepay_net)}</td>
-      <td>{f.homepay_date ? fmtDate(f.homepay_date) : "—"}</td>
+      <td>{amount(f.regular_due)}</td>
+      <td>{amount(f.regular_paid)}</td>
+      <td>{f.regular_date ? fmtDate(f.regular_date) : "—"}</td>
+      <OwedCell n={regularOwed} />
       <td>{money(period.personalDue)}</td>
       <td>{amount(f.personal_paid)}</td>
       <td>{f.personal_date ? fmtDate(f.personal_date) : "—"}</td>
       <td>{f.route || "—"}</td>
-      <td className={Math.abs(owed) >= 0.005 ? "ot" : ""}>{money(owed)}</td>
+      <OwedCell n={owed} />
+      <OwedCell n={regularOwed + owed} />
       <td><b>{money(pay.net + pay.paid)}</b></td>
       <td className="l">
         {f.notes}
@@ -154,20 +167,21 @@ function PaymentForm({ period, pay, editable, today, venmoHandle }: Props & { pa
     } catch {}
   }
 
-  /** Entering an empty field offers the likely value: today's date, or the amount still due. */
+  /** Entering an empty field offers the likely value: today's date, or the full amount due. */
   const prefill = (k: keyof typeof f, value: string, el: HTMLInputElement) => {
     if (f[k] !== "" || !value) return;
     set(k, value);
     requestAnimationFrame(() => el.select?.());
   };
 
-  const num = (k: "homepay_earnings" | "homepay_net" | "personal_paid", label: string) => (
+  const fullAmount = { regular_due: 0, regular_paid: Number(f.regular_due) || 0, personal_paid: outstanding };
+  const num = (k: keyof typeof fullAmount, label: string) => (
     <div className="field">
       <label>{label}</label>
       {editable ? (
         <input
           type="number" inputMode="decimal" step="0.01" value={f[k]}
-          onFocus={(e) => (k === "personal_paid" && outstanding > 0.005 ? prefill(k, outstanding.toFixed(2), e.target) : e.target.select())}
+          onFocus={(e) => (fullAmount[k] > 0.005 ? prefill(k, fullAmount[k].toFixed(2), e.target) : e.target.select())}
           onChange={(e) => set(k, e.target.value)} onBlur={blur}
         />
       ) : (
@@ -175,7 +189,7 @@ function PaymentForm({ period, pay, editable, today, venmoHandle }: Props & { pa
       )}
     </div>
   );
-  const date = (k: "homepay_date" | "personal_date", label: string) => (
+  const date = (k: "regular_date" | "personal_date", label: string) => (
     <div className="field">
       <label>{label}</label>
       {editable ? (
@@ -209,11 +223,11 @@ function PaymentForm({ period, pay, editable, today, venmoHandle }: Props & { pa
           </span>
         </div>
       </div>
-      {num("homepay_earnings", "Homepay earnings")}
-      {num("homepay_net", "Homepay net paid")}
-      {date("homepay_date", "Homepay paid date")}
-      {calc("Personal comp due", money(period.personalDue))}
-      {num("personal_paid", "Personal comp paid")}
+      {num("regular_due", "Regular due")}
+      {num("regular_paid", "Regular paid")}
+      {date("regular_date", "Regular paid date")}
+      {calc("Personal due", money(period.personalDue))}
+      {num("personal_paid", "Personal paid")}
       {date("personal_date", "Personal paid date")}
       <div className="field">
         <label>Personal pay route</label>

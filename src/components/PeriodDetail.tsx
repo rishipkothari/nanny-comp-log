@@ -58,6 +58,7 @@ function Body({ d, close }: { d: PeriodDetail; close: () => void }) {
     <div className={cls ? `rowline ${cls}` : "rowline"}><span>{label}</span><b>{value}</b></div>
   );
   const owed = d.status.outstanding;
+  const regularOwed = p.regularDue - p.regularPaid;
 
   return (
     <>
@@ -87,16 +88,17 @@ function Body({ d, close }: { d: PeriodDetail; close: () => void }) {
         {line(`Overtime pay (${hrs(p.ot)} h × ${money(d.otRate)})`, money(p.ot * d.otRate))}
         {line("Stipend", money(p.stipend))}
         {line("Expenses", money(p.expenses))}
-        {line("Personal pay due", money(p.personalDue), "total")}
-        {line("Personal pay paid", pay?.personal_paid != null ? money(pay.personal_paid) : "—")}
+        {line("Personal due", money(p.personalDue), "total")}
+        {line("Personal paid", pay?.personal_paid != null ? money(pay.personal_paid) : "—")}
         {line("Paid date", pay?.personal_date ? fmtDate(pay.personal_date) : "—")}
         {line("Route", pay?.route || "—")}
         {Math.abs(owed) >= 0.005 && line(owed > 0 ? "Still owed" : "Overpaid", money(Math.abs(owed)), "warn")}
 
-        <h3>Homepay</h3>
-        {line("Earnings", pay?.homepay_earnings != null ? money(pay.homepay_earnings) : "—")}
-        {line("Net paid", pay?.homepay_net != null ? money(pay.homepay_net) : "—")}
-        {line("Paid date", pay?.homepay_date ? fmtDate(pay.homepay_date) : "—")}
+        <h3>Regular pay</h3>
+        {line("Regular due", pay?.regular_due != null ? money(pay.regular_due) : "—")}
+        {line("Regular paid", pay?.regular_paid != null ? money(pay.regular_paid) : "—")}
+        {line("Paid date", pay?.regular_date ? fmtDate(pay.regular_date) : "—")}
+        {Math.abs(regularOwed) >= 0.005 && line(regularOwed > 0 ? "Still owed" : "Overpaid", money(Math.abs(regularOwed)), "warn")}
 
         {line("Total paid", money(p.totalPaid), "total")}
         {pay?.notes && line("Notes", pay.notes)}

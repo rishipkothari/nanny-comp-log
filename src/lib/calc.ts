@@ -70,9 +70,9 @@ export const emptyDay = (date: string): DayRow => ({
 
 export type PaymentRow = {
   period_start: string;
-  homepay_earnings: number | null;
-  homepay_net: number | null;
-  homepay_date: string | null;
+  regular_due: number | null;
+  regular_paid: number | null;
+  regular_date: string | null;
   personal_paid: number | null;
   personal_date: string | null;
   route: string | null;
@@ -83,7 +83,7 @@ export type PaymentRow = {
 };
 
 export const hasPaymentData = (p: PaymentRow) =>
-  p.approved || [p.homepay_earnings, p.homepay_net, p.homepay_date, p.personal_paid, p.personal_date, p.route, p.notes].some((v) => v !== null && v !== "");
+  p.approved || [p.regular_due, p.regular_paid, p.regular_date, p.personal_paid, p.personal_date, p.route, p.notes].some((v) => v !== null && v !== "");
 
 export type Period = {
   id: string;
@@ -99,7 +99,8 @@ export type Period = {
   ot: number;
   personalDue: number;
   payment: PaymentRow | null;
-  homepayNet: number;
+  regularDue: number;
+  regularPaid: number;
   personalPaid: number;
   totalPaid: number;
   approved: boolean;
@@ -126,7 +127,7 @@ export function buildPeriods(days: DayRow[], payments: PaymentRow[], settings: S
         worked: 0, vacation: 0, sick: 0, holiday: 0, stipend: 0, expenses: 0,
         total: 0, ot: 0, personalDue: 0,
         payment: payMap.get(start) ?? null,
-        homepayNet: 0, personalPaid: 0, totalPaid: 0, approved: false,
+        regularDue: 0, regularPaid: 0, personalPaid: 0, totalPaid: 0, approved: false,
       };
       byStart.set(start, p);
     }
@@ -149,9 +150,10 @@ export function buildPeriods(days: DayRow[], payments: PaymentRow[], settings: S
     p.total = p.worked + p.vacation + p.sick + p.holiday;
     p.ot = Math.max(p.total - settings.otThreshold, 0);
     p.personalDue = p.ot * settings.otRate + p.stipend + p.expenses;
-    p.homepayNet = p.payment?.homepay_net ?? 0;
+    p.regularDue = p.payment?.regular_due ?? 0;
+    p.regularPaid = p.payment?.regular_paid ?? 0;
     p.personalPaid = p.payment?.personal_paid ?? 0;
-    p.totalPaid = p.homepayNet + p.personalPaid;
+    p.totalPaid = p.regularPaid + p.personalPaid;
     p.approved = p.payment?.approved ?? false;
   }
   return out
@@ -166,17 +168,17 @@ export type PeriodStatus = { open: boolean; approved: boolean; balanced: boolean
 
 /**
  * One definition of status for the whole app. A closed period carries two independent badges:
- * whether its hours are approved, and whether it is balanced: Homepay paid for any hours,
- * and personal pay made equal to personal pay due.
+ * whether its hours are approved, and whether it is balanced: regular paid equals regular due
+ * (and is paid at all for any hours), and personal paid equals personal due.
  */
 export function periodStatus(
-  p: { end: string; total: number; homepayNet: number; personalDue: number; personalPaid: number; approved: boolean },
+  p: { end: string; total: number; regularDue: number; regularPaid: number; personalDue: number; personalPaid: number; approved: boolean },
   today: string,
 ): PeriodStatus {
   const outstanding = p.personalDue - p.personalPaid;
   const personalBalanced = Math.abs(outstanding) < 0.005;
-  const homepayMissing = p.total > 0 && p.homepayNet <= 0;
-  const balanced = personalBalanced && !homepayMissing;
+  const regularBalanced = Math.abs(p.regularDue - p.regularPaid) < 0.005 && !(p.total > 0 && p.regularPaid <= 0);
+  const balanced = personalBalanced && regularBalanced;
   if (p.end >= today) return { open: true, approved: p.approved, balanced, outstanding, badges: [{ label: "open", tone: "neutral" }] };
   const badges: Badge[] = [
     p.approved ? { label: "hours approved", tone: "ok" } : { label: "hours not approved", tone: "warn" },
@@ -209,7 +211,7 @@ export const GROUPS: { key: Group; label: string }[] = [
 ];
 
 export type HoursRow = { key: string; label: string; working: number; vacation: number; sick: number; holiday: number; total: number; ot: number | null };
-export type PaymentsRow = { key: string; label: string; hours: number; earnings: number; homepay: number; due: number; paid: number; owed: number; totalPaid: number };
+export type PaymentsRow = { key: string; label: string; hours: number; regularDue: number; regularPaid: number; regularOwed: number; due: number; paid: number; owed: number; totalOwed: number; totalPaid: number };
 
 const monthLabel = (ym: string) =>
   new Date(parse(`${ym}-01`)).toLocaleString("en-US", { month: "short", year: "numeric", timeZone: "UTC" });
@@ -255,15 +257,17 @@ export function paymentsRows(periods: Period[], group: Group, today: string): Pa
     let r = map.get(key);
     if (!r) {
       const label = group === "period" ? periodLabel(p) : group === "month" ? monthLabel(key) : group === "year" ? key : `${key} to date`;
-      r = { key, label, hours: 0, earnings: 0, homepay: 0, due: 0, paid: 0, owed: 0, totalPaid: 0 };
+      r = { key, label, hours: 0, regularDue: 0, regularPaid: 0, regularOwed: 0, due: 0, paid: 0, owed: 0, totalOwed: 0, totalPaid: 0 };
       map.set(key, r);
     }
     r.hours += p.total;
-    r.earnings += p.payment?.homepay_earnings ?? 0;
-    r.homepay += p.homepayNet;
+    r.regularDue += p.regularDue;
+    r.regularPaid += p.regularPaid;
     r.due += p.personalDue;
     r.paid += p.personalPaid;
+    r.regularOwed += p.regularDue - p.regularPaid;
     r.owed += p.personalDue - p.personalPaid;
+    r.totalOwed += p.regularDue + p.personalDue - p.totalPaid;
     r.totalPaid += p.totalPaid;
   }
   return [...map.values()].sort((a, b) => (a.key < b.key ? 1 : -1));

@@ -53,7 +53,7 @@ for (const r of log) {
   if (!empty) days.push(row);
 }
 
-// Payment Log: B start, D homepay earnings, E net paid, F paid date, H personal paid, I paid date, J route, M notes
+// Payment Log: B start, D regular due (Homepay earnings), E regular paid (net paid), F paid date, H personal paid, I paid date, J route, M notes
 const pay = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets["Payment Log"], { header: 1, raw: true }).slice(1);
 const payments = new Map<string, Record<string, unknown>>();
 for (const r of pay) {
@@ -61,15 +61,15 @@ for (const r of pay) {
   if (!start) continue;
   const row = {
     period_start: periodStart(start),
-    homepay_earnings: num(r[3]),
-    homepay_net: num(r[4]),
-    homepay_date: iso(r[5]),
+    regular_due: num(r[3]),
+    regular_paid: num(r[4]),
+    regular_date: iso(r[5]),
     personal_paid: num(r[7]),
     personal_date: iso(r[8]),
     route: r[9] ? String(r[9]) : null,
     notes: r[12] ? String(r[12]) : null,
   };
-  const empty = !row.homepay_earnings && !row.homepay_net && !row.homepay_date && !row.personal_paid && !row.personal_date && !row.route && !row.notes;
+  const empty = !row.regular_due && !row.regular_paid && !row.regular_date && !row.personal_paid && !row.personal_date && !row.route && !row.notes;
   if (!empty) payments.set(row.period_start, row);
 }
 
@@ -86,10 +86,14 @@ for (const d of days) {
       notes = EXCLUDED.notes`;
 }
 for (const p of payments.values()) {
-  await sql`INSERT INTO payments (period_start, homepay_earnings, homepay_net, homepay_date, personal_paid, personal_date, route, notes)
-    VALUES (${p.period_start as string}, ${p.homepay_earnings as number | null}, ${p.homepay_net as number | null}, ${p.homepay_date as string | null},
+  // legacy homepay_* columns are kept in sync for the previous release
+  const due = p.regular_due as number | null, paid = p.regular_paid as number | null, date = p.regular_date as string | null;
+  await sql`INSERT INTO payments (period_start, regular_due, regular_paid, regular_date, homepay_earnings, homepay_net, homepay_date,
+      personal_paid, personal_date, route, notes)
+    VALUES (${p.period_start as string}, ${due}, ${paid}, ${date}, ${due}, ${paid}, ${date},
       ${p.personal_paid as number | null}, ${p.personal_date as string | null}, ${p.route as string | null}, ${p.notes as string | null})
-    ON CONFLICT (period_start) DO UPDATE SET homepay_earnings = EXCLUDED.homepay_earnings, homepay_net = EXCLUDED.homepay_net,
+    ON CONFLICT (period_start) DO UPDATE SET regular_due = EXCLUDED.regular_due, regular_paid = EXCLUDED.regular_paid,
+      regular_date = EXCLUDED.regular_date, homepay_earnings = EXCLUDED.homepay_earnings, homepay_net = EXCLUDED.homepay_net,
       homepay_date = EXCLUDED.homepay_date, personal_paid = EXCLUDED.personal_paid, personal_date = EXCLUDED.personal_date,
       route = EXCLUDED.route, notes = EXCLUDED.notes`;
 }

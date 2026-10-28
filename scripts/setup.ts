@@ -96,6 +96,14 @@ await sql`UPDATE days SET sick_h = (round(sick * 60)::int) / 60, sick_m = (round
   WHERE sick > 0 AND sick_h = 0 AND sick_m = 0`;
 await sql`UPDATE days SET hol_h = 8 WHERE holiday AND hol_h = 0 AND hol_m = 0`;
 
+// Homepay earnings / net / date become regular due / paid / date, matching personal due / paid.
+// The legacy homepay_* columns stay and are kept in sync by the app so the previous release keeps
+// working until this one is merged; the copy below catches up anything that release wrote meanwhile.
+await sql`ALTER TABLE payments ADD COLUMN IF NOT EXISTS regular_due numeric(10,2)`;
+await sql`ALTER TABLE payments ADD COLUMN IF NOT EXISTS regular_paid numeric(10,2)`;
+await sql`ALTER TABLE payments ADD COLUMN IF NOT EXISTS regular_date date`;
+await sql`UPDATE payments SET regular_due = homepay_earnings, regular_paid = homepay_net, regular_date = homepay_date`;
+
 await sql`INSERT INTO settings (key, value) VALUES ('ot_rate', '28'), ('ot_threshold', '40'), ('venmo_handle', '"anat-sweeney"') ON CONFLICT (key) DO NOTHING`;
 
 console.log("schema ready");
