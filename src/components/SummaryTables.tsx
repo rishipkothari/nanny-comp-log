@@ -1,38 +1,59 @@
 import Link from "next/link";
-import StatusBadges from "./StatusBadges";
-import { fmtDate, hrs, money, type Group, type HoursRow, type PaymentsRow } from "@/lib/calc";
+import { PaymentTableRow } from "./PaymentCard";
+import { DetailTable } from "./PeriodDetail";
+import { hrs, money, type Group, type HoursRow, type PaymentsRow, type Period, type PeriodDetail } from "@/lib/calc";
 
-/** A row whose cells all link to `href`, so the whole row is clickable. */
-function Cells({ href, cells }: { href?: string; cells: [React.ReactNode, string?][] }) {
-  return cells.map(([content, className], i) => (
-    <td key={i} className={className}>
-      {href ? <Link href={href}>{content}</Link> : content}
-    </td>
-  ));
+/** Hours per pay period, month or year. A row links to `href`, or opens its period's popup from `details`. */
+export function HoursTable({ rows, group, href, details }: {
+  rows: HoursRow[]; group: Group; href?: (r: HoursRow) => string; details?: Map<string, PeriodDetail>;
+}) {
+  const head = (
+    <tr>
+      <th>{group === "period" ? "Pay period" : group === "month" ? "Month" : "Year"}</th>
+      <th>Working</th><th>Vacation</th><th>Sick</th><th>Holiday</th><th>Total</th>
+      {group === "period" && <th>OT</th>}
+    </tr>
+  );
+  const cells = (r: HoursRow) => {
+    const link = (c: React.ReactNode) => (href ? <Link href={href(r)}>{c}</Link> : c);
+    return (
+      <>
+        <td>{link(r.label)}</td>
+        <td>{link(hrs(r.working))}</td><td>{link(hrs(r.vacation))}</td><td>{link(hrs(r.sick))}</td><td>{link(hrs(r.holiday))}</td>
+        <td>{link(<b>{hrs(r.total)}</b>)}</td>
+        {group === "period" && <td className={r.ot ? "ot" : ""}>{link(hrs(r.ot ?? 0))}</td>}
+      </>
+    );
+  };
+  if (href) {
+    return (
+      <div className="tablewrap">
+        <table>
+          <thead>{head}</thead>
+          <tbody>{rows.map((r) => <tr key={r.key} className="rowlink">{cells(r)}</tr>)}</tbody>
+        </table>
+      </div>
+    );
+  }
+  return <DetailTable head={head} rows={rows.map((r) => ({ key: r.key, detail: details?.get(r.key), cells: cells(r) }))} />;
 }
 
-export function HoursTable({ rows, group, href }: { rows: HoursRow[]; group: Group; href?: (r: HoursRow) => string }) {
+/** Every payment detail per pay period, with status badges; a row opens the payment popup (editable in admin mode). */
+export function PaymentLog({ periods, editable, today, venmoHandle }: { periods: Period[]; editable: boolean; today: string; venmoHandle: string }) {
   return (
-    <div className="tablewrap">
+    <div className="tablewrap paylog">
       <table>
         <thead>
           <tr>
-            <th>{group === "period" ? "Pay period" : group === "month" ? "Month" : "Year"}</th>
-            <th>Working</th><th>Vacation</th><th>Sick</th><th>Holiday</th><th>Total</th>
-            {group === "period" && <th>OT</th>}
+            <th>Pay period</th><th>Status</th><th>Approved</th><th>Hours</th>
+            <th>Homepay earnings</th><th>Homepay net</th><th>Homepay date</th>
+            <th>Personal due</th><th>Personal paid</th><th>Personal date</th><th>Route</th>
+            <th>Owed</th><th>Total paid</th><th className="l">Notes</th>
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) => (
-            <tr key={r.key} className={href ? "rowlink" : undefined}>
-              <Cells
-                href={href?.(r)}
-                cells={[
-                  [r.label], [hrs(r.working)], [hrs(r.vacation)], [hrs(r.sick)], [hrs(r.holiday)], [<b key="t">{hrs(r.total)}</b>],
-                  ...(group === "period" ? [[hrs(r.ot ?? 0), r.ot ? "ot" : ""] as [string, string]] : []),
-                ]}
-              />
-            </tr>
+          {periods.map((p) => (
+            <PaymentTableRow key={`${p.start}-${editable}`} period={p} editable={editable} today={today} venmoHandle={venmoHandle} />
           ))}
         </tbody>
       </table>
@@ -40,43 +61,25 @@ export function HoursTable({ rows, group, href }: { rows: HoursRow[]; group: Gro
   );
 }
 
-const day = (d: string | null) => (d ? fmtDate(d) : "—");
-
-/** Pay periods show every payment detail and status badges; month and year rollups show the sums. */
-export function PaymentsTable({ rows, href }: { rows: PaymentsRow[]; href?: (r: PaymentsRow) => string }) {
-  const detail = rows.some((r) => r.detail);
+/** Payment sums per month or year (pay periods use PaymentLog). */
+export function PaymentsTable({ rows }: { rows: PaymentsRow[] }) {
   return (
     <div className="tablewrap">
-      <table className="paytable">
+      <table>
         <thead>
           <tr>
-            <th>Period</th>
-            {detail && <th className="l">Status</th>}
-            <th>Hours</th><th>Personal due</th><th>Personal paid</th>
-            {detail && <><th>Paid on</th><th className="l">Route</th></>}
-            <th>Owed</th><th>Homepay earnings</th><th>Homepay net</th>
-            {detail && <th>Homepay on</th>}
-            <th>Total paid</th>
-            {detail && <th>Notes</th>}
+            <th>Period</th><th>Hours</th><th>Homepay earnings</th><th>Homepay net</th><th>Personal due</th><th>Personal paid</th><th>Owed</th><th>Total paid</th>
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) => {
-            const d = r.detail;
-            const cells: [React.ReactNode, string?][] = [[r.label]];
-            if (detail) cells.push([d ? <StatusBadges key="s" status={d.status} /> : null, "status l"]);
-            cells.push([hrs(r.hours)], [money(r.due)], [money(r.paid)]);
-            if (detail) cells.push([day(d?.personalDate ?? null)], [d?.route || "—", "l"]);
-            cells.push([money(r.owed), Math.abs(r.owed) >= 0.005 ? "ot" : ""], [money(r.earnings)], [money(r.homepay)]);
-            if (detail) cells.push([day(d?.homepayDate ?? null)]);
-            cells.push([<b key="t">{money(r.totalPaid)}</b>]);
-            if (detail) cells.push([d?.notes || "—", "notes"]);
-            return (
-              <tr key={r.key} className={href ? "rowlink" : undefined}>
-                <Cells href={href?.(r)} cells={cells} />
-              </tr>
-            );
-          })}
+          {rows.map((r) => (
+            <tr key={r.key}>
+              <td>{r.label}</td><td>{hrs(r.hours)}</td>
+              <td>{money(r.earnings)}</td><td>{money(r.homepay)}</td><td>{money(r.due)}</td><td>{money(r.paid)}</td>
+              <td className={Math.abs(r.owed) >= 0.005 ? "ot" : ""}>{money(r.owed)}</td>
+              <td><b>{money(r.totalPaid)}</b></td>
+            </tr>
+          ))}
         </tbody>
       </table>
     </div>

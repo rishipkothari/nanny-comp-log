@@ -50,6 +50,8 @@ input, select { font: inherit; color: var(--text); }
 .drawer nav a.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
 .drawerfoot { margin-top: auto; display: flex; flex-direction: column; gap: 8px; }
 .drawerfoot button, .drawerfoot .btn { width: 100%; text-align: center; }
+.drawertop { margin-bottom: 10px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+.drawertop button, .drawertop .btn { width: 100%; text-align: center; }
 
 /* tabs, segmented control, chips */
 .tabs { display: flex; gap: 20px; border-bottom: 1px solid var(--line); margin-bottom: 14px; }
@@ -100,10 +102,6 @@ th:first-child, td:first-child { text-align: left; }
 th { color: var(--muted); font-weight: 500; font-size: 13px; }
 tbody tr:last-child td { border-bottom: 0; }
 td.ot { color: var(--accent); font-weight: 600; }
-.paytable .l, .paytable th:last-child, .paytable td.notes { text-align: left; }
-.paytable td.status .badges { justify-content: flex-start; flex-wrap: nowrap; }
-.paytable th:first-child, .paytable td:first-child { position: sticky; left: 0; background: var(--card); z-index: 1; }
-.paytable td.notes { white-space: normal; min-width: 180px; }
 tr.rowlink td { padding: 0; }
 tr.rowlink td > a { display: block; padding: 9px 12px; color: inherit; }
 tr.rowlink:hover td { background: var(--accent-soft); }
@@ -229,8 +227,33 @@ button.danger { color: var(--bad); border-color: var(--bad); background: transpa
 .debugrow { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .debugrow select { padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); }
 .pcard .vals.four { grid-template-columns: repeat(4, 1fr); }
-.pcard .vals.four div > span + span { font-size: 11px; margin-top: 2px; }
-@media (max-width: 480px) { .pcard .vals.four { grid-template-columns: repeat(2, 1fr); row-gap: 10px; } }
+.pcard .vals div > span + span { font-size: 11px; margin-top: 2px; }
+@media (max-width: 480px) {
+  .pcard .vals.four { grid-template-columns: repeat(2, 1fr); row-gap: 10px; }
+}
+
+/* pay period detail popup */
+tr.tap { cursor: pointer; }
+tr.tap:hover td { background: var(--accent-soft); }
+dialog.detail { width: min(420px, calc(100vw - 32px)); padding: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--text); }
+dialog.detail::backdrop { background: rgba(0, 0, 0, 0.4); }
+dialog.detail { max-height: calc(100dvh - 32px); }
+dialog.detail .head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; padding: 14px 14px 6px; }
+dialog.detail .headright { display: flex; align-items: flex-start; gap: 8px; }
+dialog.detail .body { padding: 0 14px 6px; }
+dialog.detail h3 { font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); margin: 14px 0 2px; }
+dialog.detail .rowline.total { border-top: 1px solid var(--line); margin-top: 4px; padding-top: 8px; }
+dialog.detail .rowline.total b { font-weight: 600; }
+dialog.detail .rowline.warn b { color: var(--bad); }
+dialog.detail .links { display: flex; justify-content: flex-end; gap: 16px; padding: 8px 14px 14px; }
+.card.pay { padding: 12px 14px; cursor: pointer; }
+.card.pay .paytop { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.card.pay .payfoot { display: flex; justify-content: flex-end; margin-top: 6px; }
+.paylog table { min-width: 1200px; }
+.paylog td, .paylog th { white-space: nowrap; }
+.paylog td.l, .paylog th.l { text-align: left; white-space: normal; min-width: 140px; }
+.field.calc .ro { font-weight: 600; }
+button.linkish { border: 0; background: none; padding: 0; font: inherit; color: var(--accent); cursor: pointer; }
 .pcard .links { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--line); }
 
 /* calendar page: header frozen, events scroll in their own box */

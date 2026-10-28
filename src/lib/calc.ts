@@ -166,25 +166,37 @@ export type PeriodStatus = { open: boolean; approved: boolean; balanced: boolean
 
 /**
  * One definition of status for the whole app. A closed period carries two independent badges:
- * whether its hours are approved, and whether personal pay made equals personal pay due (balanced).
+ * whether its hours are approved, and whether it is balanced: Homepay paid for any hours,
+ * and personal pay made equal to personal pay due.
  */
 export function periodStatus(
-  p: { end: string; personalDue: number; personalPaid: number; approved: boolean },
+  p: { end: string; total: number; homepayNet: number; personalDue: number; personalPaid: number; approved: boolean },
   today: string,
 ): PeriodStatus {
   const outstanding = p.personalDue - p.personalPaid;
-  const balanced = Math.abs(outstanding) < 0.005;
+  const personalBalanced = Math.abs(outstanding) < 0.005;
+  const homepayMissing = p.total > 0 && p.homepayNet <= 0;
+  const balanced = personalBalanced && !homepayMissing;
   if (p.end >= today) return { open: true, approved: p.approved, balanced, outstanding, badges: [{ label: "open", tone: "neutral" }] };
   const badges: Badge[] = [
     p.approved ? { label: "hours approved", tone: "ok" } : { label: "hours not approved", tone: "warn" },
-    balanced
-      ? { label: "balanced", tone: "ok" }
-      : { label: outstanding > 0 ? `${money(outstanding)} owed` : `${money(-outstanding)} over`, tone: "warn" },
+    balanced ? { label: "balanced", tone: "ok" } : { label: "unbalanced", tone: "warn" },
   ];
   return { open: false, approved: p.approved, balanced, outstanding, badges };
 }
 
 export const needsAttention = (s: PeriodStatus) => !s.open && (!s.approved || !s.balanced);
+
+/* ---------- pay period detail ---------- */
+
+export type Scheduled = { minutes: number; open: number };
+
+/** Everything the pay period popup shows; plain data so server pages can hand it to client components. */
+export type PeriodDetail = { period: Period; status: PeriodStatus; scheduled: Scheduled | null; otRate: number; otThreshold: number };
+
+export const periodDetail = (period: Period, today: string, settings: Settings, scheduled: Scheduled | null): PeriodDetail => ({
+  period, status: periodStatus(period, today), scheduled, otRate: settings.otRate, otThreshold: settings.otThreshold,
+});
 
 /* ---------- grouping for the summary tables ---------- */
 
@@ -197,11 +209,7 @@ export const GROUPS: { key: Group; label: string }[] = [
 ];
 
 export type HoursRow = { key: string; label: string; working: number; vacation: number; sick: number; holiday: number; total: number; ot: number | null };
-export type PaymentsRow = {
-  key: string; label: string; hours: number; earnings: number; homepay: number; due: number; paid: number; owed: number; totalPaid: number;
-  /** Per-pay-period details; null on month and year rollups. */
-  detail: { status: PeriodStatus; homepayDate: string | null; personalDate: string | null; route: string | null; notes: string | null } | null;
-};
+export type PaymentsRow = { key: string; label: string; hours: number; earnings: number; homepay: number; due: number; paid: number; owed: number; totalPaid: number };
 
 const monthLabel = (ym: string) =>
   new Date(parse(`${ym}-01`)).toLocaleString("en-US", { month: "short", year: "numeric", timeZone: "UTC" });
@@ -247,15 +255,8 @@ export function paymentsRows(periods: Period[], group: Group, today: string): Pa
     let r = map.get(key);
     if (!r) {
       const label = group === "period" ? periodLabel(p) : group === "month" ? monthLabel(key) : group === "year" ? key : `${key} to date`;
-      r = { key, label, hours: 0, earnings: 0, homepay: 0, due: 0, paid: 0, owed: 0, totalPaid: 0, detail: null };
+      r = { key, label, hours: 0, earnings: 0, homepay: 0, due: 0, paid: 0, owed: 0, totalPaid: 0 };
       map.set(key, r);
-    }
-    if (group === "period") {
-      const pay = p.payment;
-      r.detail = {
-        status: periodStatus(p, today),
-        homepayDate: pay?.homepay_date ?? null, personalDate: pay?.personal_date ?? null, route: pay?.route ?? null, notes: pay?.notes ?? null,
-      };
     }
     r.hours += p.total;
     r.earnings += p.payment?.homepay_earnings ?? 0;

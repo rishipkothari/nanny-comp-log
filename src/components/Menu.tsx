@@ -49,6 +49,15 @@ export default function Menu({ admin }: { admin: boolean }) {
               <strong>Nanny Comp Log</strong>
               <button onClick={() => setOpen(false)} aria-label="Close menu" className="small">✕</button>
             </div>
+            <div className="drawertop">
+              {admin ? (
+                <form method="post" action="/api/admin/logout">
+                  <button type="submit">Lock admin mode</button>
+                </form>
+              ) : (
+                <Link href="/admin" className="btn">Unlock admin mode</Link>
+              )}
+            </div>
             <nav>
               {items.map((i) => (
                 <Link key={i.href} href={i.href} className={i === current ? "on" : ""}>
@@ -57,13 +66,6 @@ export default function Menu({ admin }: { admin: boolean }) {
               ))}
             </nav>
             <div className="drawerfoot">
-              {admin ? (
-                <form method="post" action="/api/admin/logout">
-                  <button type="submit">Lock admin mode</button>
-                </form>
-              ) : (
-                <Link href="/admin" className="btn">Unlock admin mode</Link>
-              )}
               <form method="post" action="/api/logout">
                 <button type="submit">Log out</button>
               </form>

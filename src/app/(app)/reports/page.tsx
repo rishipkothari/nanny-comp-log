@@ -1,11 +1,13 @@
 import Link from "next/link";
 import SummaryChart, { type Point, type SeriesDef } from "@/components/SummaryChart";
-import { HoursTable, PaymentsTable } from "@/components/SummaryTables";
+import { HoursTable, PaymentLog, PaymentsTable } from "@/components/SummaryTables";
 import {
-  GROUPS, buildPeriods, fmtDate, holidayHours, hoursRows, paymentsRows, sickHours, todayET, vacationHours, workedHours,
-  type Group,
+  GROUPS, buildPeriods, fmtDate, holidayHours, hoursRows, paymentsRows, periodDetail, sickHours, todayET, vacationHours, workedHours,
+  type Group, type PeriodDetail,
 } from "@/lib/calc";
 import { getDays, getPayments, getSettings } from "@/lib/db";
+import { scheduledByPeriod } from "@/lib/schedule";
+import { isAdmin } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
@@ -31,8 +33,15 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
   const group: Group = GROUPS.some((g) => g.key === sp.g) ? (sp.g as Group) : "period";
   const today = todayET();
 
-  const [days, payments, settings] = await Promise.all([getDays(), getPayments(), getSettings()]);
+  const [days, payments, settings, admin] = await Promise.all([getDays(), getPayments(), getSettings(), isAdmin()]);
   const periods = buildPeriods(days, payments, settings);
+
+  // pay-period hours rows open the period's popup (payment rows open the payment popup)
+  let details = new Map<string, PeriodDetail>();
+  if (mode === "hours" && view === "table" && group === "period" && periods.length) {
+    const scheduled = await scheduledByPeriod(periods[periods.length - 1].start, periods[0].end);
+    details = new Map(periods.map((p) => [p.start, periodDetail(p, today, settings, scheduled.get(p.start) ?? null)]));
+  }
 
   const href = (over: Params) => {
     const q = new URLSearchParams({ m: mode, v: view, g: group, ...over } as Record<string, string>);
@@ -57,7 +66,11 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
               <Link key={g.key} href={href({ g: g.key })} className={g.key === group ? "chip on" : "chip"}>{g.label}</Link>
             ))}
           </div>
-          {mode === "hours" ? <HoursTable rows={hoursRows(days, periods, group, today)} group={group} /> : <PaymentsTable rows={paymentsRows(periods, group, today)} />}
+          {mode === "hours"
+            ? <HoursTable rows={hoursRows(days, periods, group, today)} group={group} details={details} />
+            : group === "period"
+              ? <PaymentLog periods={periods} editable={admin} today={today} venmoHandle={settings.venmoHandle} />
+              : <PaymentsTable rows={paymentsRows(periods, group, today)} />}
           {group !== "period" && (
             <p className="muted small">
               {mode === "hours"
