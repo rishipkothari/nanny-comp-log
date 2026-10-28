@@ -143,7 +143,8 @@ function PaymentForm({ period, pay, editable, today, venmoHandle }: Props & { pa
   const [copied, setCopied] = useState(false);
   const key = period.start;
   const outstanding = status.outstanding;
-  const canVenmo = editable && !!venmoHandle && outstanding > 0.005 && (f.route === "" || f.route === "Venmo");
+  // always offered in admin mode; the amount is prefilled only while personal pay is owed
+  const owed = outstanding > 0.005 ? outstanding : null;
 
   async function copy() {
     try {
@@ -237,7 +238,8 @@ function PaymentForm({ period, pay, editable, today, venmoHandle }: Props & { pa
       {editable && (
         <div className="savebar">
           <button onClick={copy}>{copied ? "Copied" : "Copy Venmo note"}</button>
-          {canVenmo && <VenmoBadge handle={venmoHandle} amount={outstanding} note={venmoNote(period)} />}
+          {venmoHandle && <VenmoBadge handle={venmoHandle} amount={owed} note={venmoNote(period)} />}
+          {venmoHandle && owed === null && <span className="muted small">no amount owed</span>}
           <SaveStatus status={pay.saveStatus} />
           <button
             type="button"
