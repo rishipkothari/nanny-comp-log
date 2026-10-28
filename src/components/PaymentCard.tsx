@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { fmtDate, fmtDateTime, hrs, money, periodStatus, venmoNote, type Period, type PeriodDetail } from "@/lib/calc";
-import { DetailButton } from "./PeriodDetail";
+import { fmtDate, fmtDateTime, hrs, money, periodStatus, venmoNote, type Period } from "@/lib/calc";
 import { useSaver } from "@/lib/useSaver";
 import SaveStatus from "./SaveStatus";
 import StatusBadges from "./StatusBadges";
@@ -10,9 +9,9 @@ import VenmoBadge from "./VenmoBadge";
 
 const ROUTES = ["Venmo", "Cash", "Zelle"];
 
-type Props = { period: Period; editable: boolean; today: string; venmoHandle: string; defaultOpen?: boolean; detail?: PeriodDetail };
+type Props = { period: Period; editable: boolean; today: string; venmoHandle: string; defaultOpen?: boolean };
 
-export default function PaymentCard({ period, editable, today, venmoHandle, defaultOpen = false, detail }: Props) {
+export default function PaymentCard({ period, editable, today, venmoHandle, defaultOpen = false }: Props) {
   const p = period.payment;
   const [f, setF] = useState({
     homepay_earnings: p?.homepay_earnings?.toString() ?? "",
@@ -53,27 +52,6 @@ export default function PaymentCard({ period, editable, today, venmoHandle, defa
     today,
   );
   const outstanding = status.outstanding;
-  // the popup reflects what is typed here, not just what was loaded
-  const live: PeriodDetail | undefined = detail && {
-    ...detail,
-    status,
-    period: {
-      ...period,
-      homepayNet: net, personalPaid: paid, totalPaid: net + paid, approved: f.approved,
-      payment: {
-        period_start: period.start,
-        homepay_earnings: f.homepay_earnings === "" ? null : Number(f.homepay_earnings),
-        homepay_net: f.homepay_net === "" ? null : net,
-        homepay_date: f.homepay_date || null,
-        personal_paid: f.personal_paid === "" ? null : paid,
-        personal_date: f.personal_date || null,
-        route: f.route || null,
-        notes: f.notes || null,
-        approved: f.approved,
-        approved_at: approvedAt,
-      },
-    },
-  };
   const canVenmo = editable && !!venmoHandle && outstanding > 0.005 && (f.route === "" || f.route === "Venmo");
 
   async function copy() {
@@ -169,7 +147,6 @@ export default function PaymentCard({ period, editable, today, venmoHandle, defa
         </div>
         <div className="rowline"><span>Total paid</span><b>{money(net + paid)}</b></div>
         <div className="savebar">
-          {live && <DetailButton detail={live} />}
           {editable && <button onClick={copy}>{copied ? "Copied" : "Copy Venmo note"}</button>}
           {canVenmo && <VenmoBadge handle={venmoHandle} amount={outstanding} note={venmoNote(period)} />}
           {editable && <SaveStatus status={statuses[key]} />}
