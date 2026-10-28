@@ -1,8 +1,9 @@
 import Link from "next/link";
 import DayForm from "@/components/DayForm";
 import PeriodGrid from "@/components/PeriodGrid";
-import { addDays, emptyDay, fmtDate, fmtDow, periodId, periodStart, todayET, type DayRow } from "@/lib/calc";
-import { getDay, getDayRange, getSettings } from "@/lib/db";
+import { HoursTable } from "@/components/SummaryTables";
+import { addDays, buildPeriods, emptyDay, fmtDate, fmtDow, hoursRows, periodId, periodStart, todayET, type DayRow } from "@/lib/calc";
+import { getDay, getDayRange, getDays, getPayments, getSettings } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -11,15 +12,17 @@ const isDate = (s: string | undefined): s is string => !!s && /^\d{4}-\d{2}-\d{2
 export default async function Timesheet({ searchParams }: { searchParams: Promise<{ d?: string; view?: string; p?: string }> }) {
   const { d, view, p } = await searchParams;
   const period = view === "period";
+  const summary = view === "summary";
   const today = todayET();
 
   return (
     <>
       <div className="tabs">
-        <Link href={isDate(d) ? `/timesheet?d=${d}` : "/timesheet"} className={period ? "" : "on"}>Daily</Link>
+        <Link href={isDate(d) ? `/timesheet?d=${d}` : "/timesheet"} className={period || summary ? "" : "on"}>Daily</Link>
         <Link href={isDate(p) ? `/timesheet?view=period&p=${p}` : "/timesheet?view=period"} className={period ? "on" : ""}>Pay period</Link>
+        <Link href="/timesheet?view=summary" className={summary ? "on" : ""}>Summary</Link>
       </div>
-      {period ? <PeriodView anchor={isDate(p) ? p : today} /> : <DailyView date={isDate(d) ? d : today} />}
+      {summary ? <SummaryView today={today} /> : period ? <PeriodView anchor={isDate(p) ? p : today} /> : <DailyView date={isDate(d) ? d : today} />}
     </>
   );
 }
@@ -69,4 +72,11 @@ async function PeriodView({ anchor }: { anchor: string }) {
       <PeriodGrid key={start} initial={rows} settings={settings} />
     </>
   );
+}
+
+/** Read-only hours per pay period; a row opens that period in the batch editor. */
+async function SummaryView({ today }: { today: string }) {
+  const [days, payments, settings] = await Promise.all([getDays(), getPayments(), getSettings()]);
+  const rows = hoursRows(days, buildPeriods(days, payments, settings), "period", today);
+  return <HoursTable rows={rows} group="period" href={(r) => `/timesheet?view=period&p=${r.key}`} />;
 }

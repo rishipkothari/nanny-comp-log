@@ -1,7 +1,8 @@
 import Link from "next/link";
 import SummaryChart, { type Point, type SeriesDef } from "@/components/SummaryChart";
+import { HoursTable, PaymentsTable } from "@/components/SummaryTables";
 import {
-  GROUPS, buildPeriods, fmtDate, holidayHours, hoursRows, hrs, money, paymentsRows, sickHours, todayET, vacationHours, workedHours,
+  GROUPS, buildPeriods, fmtDate, holidayHours, hoursRows, paymentsRows, sickHours, todayET, vacationHours, workedHours,
   type Group,
 } from "@/lib/calc";
 import { getDays, getPayments, getSettings } from "@/lib/db";
@@ -23,7 +24,7 @@ const PAY_SERIES: SeriesDef[] = [
 
 type Params = { m?: string; v?: string; g?: string };
 
-export default async function Summary({ searchParams }: { searchParams: Promise<Params> }) {
+export default async function Reports({ searchParams }: { searchParams: Promise<Params> }) {
   const sp = await searchParams;
   const mode = sp.m === "payments" ? "payments" : "hours";
   const view = sp.v === "chart" ? "chart" : "table";
@@ -35,7 +36,7 @@ export default async function Summary({ searchParams }: { searchParams: Promise<
 
   const href = (over: Params) => {
     const q = new URLSearchParams({ m: mode, v: view, g: group, ...over } as Record<string, string>);
-    return `/summary?${q.toString()}`;
+    return `/reports?${q.toString()}`;
   };
 
   return (
@@ -96,55 +97,5 @@ export default async function Summary({ searchParams }: { searchParams: Promise<
         />
       )}
     </>
-  );
-}
-
-function HoursTable({ rows, group }: { rows: ReturnType<typeof hoursRows>; group: Group }) {
-  return (
-    <div className="tablewrap">
-      <table>
-        <thead>
-          <tr>
-            <th>{group === "period" ? "Pay period" : group === "month" ? "Month" : "Year"}</th>
-            <th>Working</th><th>Vacation</th><th>Sick</th><th>Holiday</th><th>Total</th>
-            {group === "period" && <th>OT</th>}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.key}>
-              <td>{r.label}</td>
-              <td>{hrs(r.working)}</td><td>{hrs(r.vacation)}</td><td>{hrs(r.sick)}</td><td>{hrs(r.holiday)}</td>
-              <td><b>{hrs(r.total)}</b></td>
-              {group === "period" && <td className={r.ot ? "ot" : ""}>{hrs(r.ot ?? 0)}</td>}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function PaymentsTable({ rows }: { rows: ReturnType<typeof paymentsRows> }) {
-  return (
-    <div className="tablewrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Period</th><th>Homepay net</th><th>Personal due</th><th>Personal paid</th><th>Owed</th><th>Total paid</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.key}>
-              <td>{r.label}</td>
-              <td>{money(r.homepay)}</td><td>{money(r.due)}</td><td>{money(r.paid)}</td>
-              <td className={Math.abs(r.owed) >= 0.005 ? "ot" : ""}>{money(r.owed)}</td>
-              <td><b>{money(r.totalPaid)}</b></td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
   );
 }
