@@ -211,7 +211,7 @@ export const GROUPS: { key: Group; label: string }[] = [
 ];
 
 export type HoursRow = { key: string; label: string; working: number; vacation: number; sick: number; holiday: number; total: number; ot: number | null };
-export type PaymentsRow = { key: string; label: string; hours: number; regularDue: number; regularPaid: number; due: number; paid: number; owed: number; totalPaid: number };
+export type PaymentsRow = { key: string; label: string; hours: number; regularDue: number; regularPaid: number; regularOwed: number; due: number; paid: number; owed: number; totalOwed: number; totalPaid: number };
 
 const monthLabel = (ym: string) =>
   new Date(parse(`${ym}-01`)).toLocaleString("en-US", { month: "short", year: "numeric", timeZone: "UTC" });
@@ -257,7 +257,7 @@ export function paymentsRows(periods: Period[], group: Group, today: string): Pa
     let r = map.get(key);
     if (!r) {
       const label = group === "period" ? periodLabel(p) : group === "month" ? monthLabel(key) : group === "year" ? key : `${key} to date`;
-      r = { key, label, hours: 0, regularDue: 0, regularPaid: 0, due: 0, paid: 0, owed: 0, totalPaid: 0 };
+      r = { key, label, hours: 0, regularDue: 0, regularPaid: 0, regularOwed: 0, due: 0, paid: 0, owed: 0, totalOwed: 0, totalPaid: 0 };
       map.set(key, r);
     }
     r.hours += p.total;
@@ -265,7 +265,9 @@ export function paymentsRows(periods: Period[], group: Group, today: string): Pa
     r.regularPaid += p.regularPaid;
     r.due += p.personalDue;
     r.paid += p.personalPaid;
+    r.regularOwed += p.regularDue - p.regularPaid;
     r.owed += p.personalDue - p.personalPaid;
+    r.totalOwed += p.regularDue + p.personalDue - p.totalPaid;
     r.totalPaid += p.totalPaid;
   }
   return [...map.values()].sort((a, b) => (a.key < b.key ? 1 : -1));

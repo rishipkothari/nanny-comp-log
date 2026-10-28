@@ -53,7 +53,7 @@ function usePayment(period: Period, today: string) {
     { end: period.end, total: period.total, regularDue, regularPaid: net, personalDue: period.personalDue, personalPaid: paid, approved: f.approved },
     today,
   );
-  return { f, set, blur, clear, approvedAt, saveStatus: statuses[key], net, paid, status };
+  return { f, set, blur, clear, approvedAt, saveStatus: statuses[key], regularDue, net, paid, status };
 }
 
 type Payment = ReturnType<typeof usePayment>;
@@ -90,12 +90,18 @@ export default function PaymentCard({ period, editable, today, venmoHandle, defa
   );
 }
 
+/** An amount still owed (negative when overpaid), highlighted unless settled. */
+export function OwedCell({ n }: { n: number }) {
+  return <td className={Math.abs(n) >= 0.005 ? "ot" : ""}>{money(n)}</td>;
+}
+
 /** One row of the payments log; tapping it opens the payment popup. */
 export function PaymentTableRow({ period, editable, today, venmoHandle }: Props) {
   const pay = usePayment(period, today);
   const [open, setOpen] = useState(false);
   const { f, status } = pay;
   const owed = status.outstanding;
+  const regularOwed = pay.regularDue - pay.net;
   const amount = (v: string) => (v === "" ? "—" : money(Number(v)));
 
   return (
@@ -107,11 +113,13 @@ export function PaymentTableRow({ period, editable, today, venmoHandle }: Props)
       <td>{amount(f.regular_due)}</td>
       <td>{amount(f.regular_paid)}</td>
       <td>{f.regular_date ? fmtDate(f.regular_date) : "—"}</td>
+      <OwedCell n={regularOwed} />
       <td>{money(period.personalDue)}</td>
       <td>{amount(f.personal_paid)}</td>
       <td>{f.personal_date ? fmtDate(f.personal_date) : "—"}</td>
       <td>{f.route || "—"}</td>
-      <td className={Math.abs(owed) >= 0.005 ? "ot" : ""}>{money(owed)}</td>
+      <OwedCell n={owed} />
+      <OwedCell n={regularOwed + owed} />
       <td><b>{money(pay.net + pay.paid)}</b></td>
       <td className="l">
         {f.notes}

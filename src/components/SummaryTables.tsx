@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { PaymentTableRow } from "./PaymentCard";
+import { OwedCell, PaymentTableRow } from "./PaymentCard";
 import { DetailTable } from "./PeriodDetail";
 import { hrs, money, type Group, type HoursRow, type PaymentsRow, type Period, type PeriodDetail } from "@/lib/calc";
 
@@ -46,9 +46,9 @@ export function PaymentLog({ periods, editable, today, venmoHandle }: { periods:
         <thead>
           <tr>
             <th>Pay period</th><th>Status</th><th>Approved</th><th>Hours</th>
-            <th>Regular due</th><th>Regular paid</th><th>Regular date</th>
-            <th>Personal due</th><th>Personal paid</th><th>Personal date</th><th>Route</th>
-            <th>Owed</th><th>Total paid</th><th className="l">Notes</th>
+            <th>Regular due</th><th>Regular paid</th><th>Regular date</th><th>Regular owed</th>
+            <th>Personal due</th><th>Personal paid</th><th>Personal date</th><th>Route</th><th>Personal owed</th>
+            <th>Total owed</th><th>Total paid</th><th className="l">Notes</th>
           </tr>
         </thead>
         <tbody>
@@ -68,15 +68,16 @@ export function PaymentsTable({ rows }: { rows: PaymentsRow[] }) {
       <table>
         <thead>
           <tr>
-            <th>Period</th><th>Hours</th><th>Regular due</th><th>Regular paid</th><th>Personal due</th><th>Personal paid</th><th>Owed</th><th>Total paid</th>
+            <th>Period</th><th>Hours</th><th>Regular due</th><th>Regular paid</th><th>Regular owed</th>
+            <th>Personal due</th><th>Personal paid</th><th>Personal owed</th><th>Total owed</th><th>Total paid</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((r) => (
             <tr key={r.key}>
               <td>{r.label}</td><td>{hrs(r.hours)}</td>
-              <td>{money(r.regularDue)}</td><td>{money(r.regularPaid)}</td><td>{money(r.due)}</td><td>{money(r.paid)}</td>
-              <td className={Math.abs(r.owed) >= 0.005 ? "ot" : ""}>{money(r.owed)}</td>
+              <td>{money(r.regularDue)}</td><td>{money(r.regularPaid)}</td><OwedCell n={r.regularOwed} />
+              <td>{money(r.due)}</td><td>{money(r.paid)}</td><OwedCell n={r.owed} /><OwedCell n={r.totalOwed} />
               <td><b>{money(r.totalPaid)}</b></td>
             </tr>
           ))}
