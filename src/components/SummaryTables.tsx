@@ -46,7 +46,7 @@ export function PaymentLog({ periods, editable, today, venmoHandle }: { periods:
         <thead>
           <tr>
             <th>Pay period</th><th>Status</th><th>Approved</th><th>Hours</th>
-            <th>Homepay earnings</th><th>Homepay net</th><th>Homepay date</th>
+            <th>Regular due</th><th>Regular paid</th><th>Regular date</th>
             <th>Personal due</th><th>Personal paid</th><th>Personal date</th><th>Route</th>
             <th>Owed</th><th>Total paid</th><th className="l">Notes</th>
           </tr>
@@ -68,14 +68,14 @@ export function PaymentsTable({ rows }: { rows: PaymentsRow[] }) {
       <table>
         <thead>
           <tr>
-            <th>Period</th><th>Hours</th><th>Homepay earnings</th><th>Homepay net</th><th>Personal due</th><th>Personal paid</th><th>Owed</th><th>Total paid</th>
+            <th>Period</th><th>Hours</th><th>Regular due</th><th>Regular paid</th><th>Personal due</th><th>Personal paid</th><th>Owed</th><th>Total paid</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((r) => (
             <tr key={r.key}>
               <td>{r.label}</td><td>{hrs(r.hours)}</td>
-              <td>{money(r.earnings)}</td><td>{money(r.homepay)}</td><td>{money(r.due)}</td><td>{money(r.paid)}</td>
+              <td>{money(r.regularDue)}</td><td>{money(r.regularPaid)}</td><td>{money(r.due)}</td><td>{money(r.paid)}</td>
               <td className={Math.abs(r.owed) >= 0.005 ? "ot" : ""}>{money(r.owed)}</td>
               <td><b>{money(r.totalPaid)}</b></td>
             </tr>
