@@ -63,6 +63,9 @@ export default function PaymentCard({ period, editable, today, venmoHandle, defa
   const pay = usePayment(period, today);
   const [open, setOpen] = useState(defaultOpen);
   const ref = useRef<HTMLDivElement>(null);
+  // only what is still owed (or overpaid) shows; settled amounts are left off
+  const owedText = (label: string, n: number) => Math.abs(n) >= 0.005 && `${label} ${n > 0 ? "owed" : "overpaid"} ${money(Math.abs(n))}`;
+  const owed = [owedText("regular", pay.regularDue - pay.net), owedText("personal", pay.status.outstanding)].filter(Boolean).join(" · ");
 
   useEffect(() => {
     if (defaultOpen) ref.current?.scrollIntoView({ block: "start" });
@@ -74,7 +77,8 @@ export default function PaymentCard({ period, editable, today, venmoHandle, defa
         <div className="paytop">
           <div>
             <div>{fmtDate(period.start)} – {fmtDate(period.end)}</div>
-            <div className="sub">{hrs(period.total)} h · personal due {money(period.personalDue)}</div>
+            <div className="sub">{hrs(period.total)} h · regular due {money(pay.regularDue)} · personal due {money(period.personalDue)}</div>
+            {owed && <div className="sub ot">{owed}</div>}
           </div>
           <div style={{ textAlign: "right" }}>
             <div>{money(pay.net + pay.paid)}</div>

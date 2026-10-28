@@ -8,6 +8,7 @@ Next.js (App Router) + Neon Postgres app for logging a nanny's hours and pay.
 - Popups use the shared `Modal` (`src/components/Modal.tsx`): pay period detail (`PeriodDetail.tsx`) and payment view/edit (`PaymentCard.tsx`).
 - Tables live in `src/components/SummaryTables.tsx`. `PaymentLog` (every payment detail plus badges, rows open the payment popup) is Payments → Summary and Reports → Payments at the pay-period grouping; Reports' month / year rollups use `PaymentsTable`. Timesheet → Summary rows link to the pay period batch editor.
 - Checks before pushing: `npx tsc --noEmit` and `npx next build` (a dummy `DATABASE_URL` is enough to build).
+- **Never commit or push without asking first.** Several sets of changes often go into one build; make the edits, run the checks, then ask.
 
 ## Backlog
 
