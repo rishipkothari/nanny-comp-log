@@ -5,7 +5,7 @@ export async function POST(req: Request) {
   const form = await req.formData();
   const token = await adminToken();
   const ok = token !== null && form.get("password") === process.env.ADMIN_PASSWORD;
-  const next = safeNext(form.get("next"), "/payments");
+  const next = safeNext(form.get("next"), "/?tab=admin");
   const res = NextResponse.redirect(new URL(ok ? next : `/admin?error=1&next=${encodeURIComponent(next)}`, req.url), 303);
   if (ok) {
     res.cookies.set(ADMIN_COOKIE, token, {

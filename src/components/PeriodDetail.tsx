@@ -1,30 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { fmtDate, fmtDateTime, hrs, money, type PeriodDetail } from "@/lib/calc";
+import Modal from "./Modal";
 import StatusBadges from "./StatusBadges";
 
 /** A pay period's hours and payments in one popup. Open while `detail` is set; closing calls onClose. */
 export function PeriodDetailDialog({ detail, onClose }: { detail: PeriodDetail | null; onClose: () => void }) {
-  const ref = useRef<HTMLDialogElement>(null);
-
-  useEffect(() => {
-    if (detail && !ref.current?.open) ref.current?.showModal();
-  }, [detail]);
-
-  const close = () => ref.current?.close();
-
   return (
-    <dialog
-      ref={ref}
-      className="detail"
-      onClose={onClose}
-      // a click on the backdrop lands on the dialog element itself
-      onClick={(e) => e.target === e.currentTarget && close()}
-    >
-      {detail && <Body d={detail} close={close} />}
-    </dialog>
+    <Modal open={!!detail} onClose={onClose}>
+      {detail && <Body d={detail} close={onClose} />}
+    </Modal>
   );
 }
 
