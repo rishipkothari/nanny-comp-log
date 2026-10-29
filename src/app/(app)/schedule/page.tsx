@@ -3,6 +3,7 @@ import { after } from "next/server";
 import CalendarTabs from "@/components/CalendarTabs";
 import ScheduleControls from "@/components/ScheduleControls";
 import ScheduleDay from "@/components/ScheduleDay";
+import ScheduleEditor from "@/components/ScheduleEditor";
 import VerboseToggle from "@/components/VerboseToggle";
 import { addDays, fmtDate, fmtDateTime, fmtDow, hrs, periodId, periodStart, todayET, workedHours } from "@/lib/calc";
 import { hasUnsyncedCalendar, listCalendars, syncAll } from "@/lib/calendar";
@@ -30,8 +31,10 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
   const loggedByDate = new Map(logged.map((d) => [d.date, d]));
   const total = scheduledTotal(days);
   const loggedWorked = logged.reduce((n, d) => n + workedHours(d), 0);
-  const lastRun = days.reduce((t, d) => (d.created_at > t ? d.created_at : t), "");
-  const usedModels = [...new Set(days.map((d) => d.model).filter(Boolean))].join(", ");
+  // the deduction's own runs, not hand edits
+  const deduced = days.flatMap((d) => (d.manual ? (d.deduced ? [d.deduced] : []) : [d]));
+  const lastRun = deduced.reduce((t, d) => (d.created_at > t ? d.created_at : t), "");
+  const usedModels = [...new Set(deduced.map((d) => d.model).filter(Boolean))].join(", ");
   const scheduleCals = calendars.filter((c) => c.is_schedule);
 
   return (
@@ -49,7 +52,7 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
         </div>
       </div>
 
-      {days.length === 0 ? (
+      {days.length === 0 && !admin ? (
         <p className="muted">No schedule deduced for this pay period yet.</p>
       ) : (
         <>
@@ -62,15 +65,17 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
             <div className="stat"><div className="n">{total.working}</div><div className="k">working days</div></div>
           </div>
           <VerboseToggle>
-            <p className="vdetail muted small">Times marked ~ come from other events or were assumed, so those days get no hour total.</p>
+            <p className="vdetail muted small">Times marked ~ come from other events or were assumed, so those days get no hour total. Days edited by hand keep their times when the schedule is deduced again.</p>
             {Array.from({ length: 7 }, (_, i) => addDays(start, i)).map((date) => {
               const day = byDate.get(date);
               const label = `${fmtDow(date)} ${fmtDate(date).replace(/\/\d{4}$/, "")}${date === today ? " · Today" : ""}`;
+              const edit = admin ? <ScheduleEditor date={date} day={day} /> : undefined;
               return day ? (
-                <ScheduleDay key={date} label={label} day={day} logged={loggedByDate.get(date)} today={today} detail />
+                <ScheduleDay key={date} label={label} day={day} logged={loggedByDate.get(date)} today={today} detail edit={edit} />
               ) : (
                 <div key={date} className="sched">
                   <div className="schedtop"><span className="schedlabel">{label}</span><span className="muted">Not deduced</span></div>
+                  {edit && <div className="savebar">{edit}</div>}
                 </div>
               );
             })}
@@ -78,13 +83,13 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
         </>
       )}
 
-      <details className="card deducebox" open={admin && days.length === 0}>
+      <details className="card deducebox" open={admin && !lastRun}>
         <summary>
           <strong>Deduce &amp; settings</strong>
-          <span className="sub">{days.length ? `Last run ${fmtDateTime(lastRun)}` : "Not run yet"}</span>
+          <span className="sub">{lastRun ? `Last run ${fmtDateTime(lastRun)}` : "Not run yet"}</span>
         </summary>
         <div className="body">
-          {days.length > 0 && (
+          {lastRun && (
             <p className="muted small">
               Deduced {fmtDateTime(lastRun)}{usedModels ? ` with ${usedModels}` : ""}.
             </p>
@@ -98,7 +103,7 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
               model={settings.scheduleModel}
               effort={settings.scheduleEffort}
               hasKey={hasApiKey()}
-              hasRun={days.length > 0}
+              hasRun={!!lastRun}
             />
           ) : (
             <p className="muted small">

@@ -275,3 +275,9 @@ main:has(.calpage) { padding-bottom: 12px; }
 .sched .vdetail > div + div { margin-top: 2px; }
 .deducebox { margin-top: 16px; }
 .deducebox .schedctl { margin-bottom: 0; }
+.schededit .blockrow { display: flex; align-items: center; gap: 6px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.schededit .blockrow input { min-width: 0; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--text); font: inherit; }
+.schededit .blockrow input[type=time] { flex: 0 0 auto; }
+.schededit .blockrow input[type=text] { flex: 1; }
+.schededit .addblock { margin: 8px 0 2px; }
+.schededit .field input[type=checkbox] { width: 18px; height: 18px; }

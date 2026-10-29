@@ -92,6 +92,14 @@ await sql`CREATE TABLE IF NOT EXISTS schedule_days (
   created_at timestamptz NOT NULL DEFAULT now()
 )`;
 await sql`ALTER TABLE schedule_days ADD COLUMN IF NOT EXISTS model text NOT NULL DEFAULT ''`;
+// Days entered by hand in the schedule editor; they win over deduced days and survive re-deduction.
+await sql`CREATE TABLE IF NOT EXISTS schedule_manual (
+  date date PRIMARY KEY,
+  working boolean NOT NULL,
+  blocks jsonb NOT NULL,
+  note text NOT NULL DEFAULT '',
+  updated_at timestamptz NOT NULL DEFAULT now()
+)`;
 await sql`CREATE INDEX IF NOT EXISTS calendar_events_start ON calendar_events (start_at)`;
 await sql`CREATE INDEX IF NOT EXISTS calendar_events_calendar ON calendar_events (calendar_id)`;
 

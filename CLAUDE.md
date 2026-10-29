@@ -7,12 +7,12 @@ Next.js (App Router) + Neon Postgres app for logging a nanny's hours and pay.
 - Admin mode (separate password) unlocks editing. Payments autosave through `useSaver`; focusing an empty paid box fills in the full amount due, and an empty date box fills in today.
 - Popups use the shared `Modal` (`src/components/Modal.tsx`): pay period detail (`PeriodDetail.tsx`) and payment view/edit (`PaymentCard.tsx`).
 - Tables live in `src/components/SummaryTables.tsx`. `PaymentLog` (every payment detail plus badges, rows open the payment popup) is Payments → Summary and Reports → Payments at the pay-period grouping; Reports' month / year rollups use `PaymentsTable`. Timesheet → Summary rows link to the pay period batch editor.
+- Schedule: deduced days live in `schedule_days`; days edited by hand (`ScheduleEditor.tsx`, admin, on the Schedule page) live in `schedule_manual`, win over the deduced day everywhere (`getScheduleDays`) and survive re-deduction. "Use deduced" deletes the hand-entered day.
 - Checks before pushing: `npx tsc --noEmit` and `npx next build` (a dummy `DATABASE_URL` is enough to build).
 - **Never commit or push without asking first.** Several sets of changes often go into one build; make the edits, run the checks, then ask.
 
 ## Backlog
 
-- **Manual schedule editor.** Create and edit the schedule by hand, alongside the deduced one.
 - **Google Calendar write-back.** Connect to Google and write the schedule to the calendar.
 - **Remove the schedule debug switch** (model and effort picker on the Schedule page, marked `DEBUG`) once the deduction prompt is tuned.
 - **Check imported history against the new balanced rule.** Older periods with hours but no regular paid, or where regular paid ≠ regular due (imported Homepay earnings vs net), now show "unbalanced".
