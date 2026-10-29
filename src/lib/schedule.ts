@@ -14,7 +14,8 @@ export type Basis = "stated" | "event" | "assumed";
 
 export type Block = { start: string; end: string; label: string; start_basis: Basis; end_basis: Basis; sources: string[] };
 
-export type ScheduleDay = {
+/** One day as deduced from the calendar or entered by hand. */
+export type DayCore = {
   date: string;
   working: boolean;
   blocks: Block[];
@@ -27,8 +28,18 @@ export type ScheduleDay = {
   model: string;
 };
 
+export type ScheduleDay = DayCore & {
+  /** Entered by hand in the schedule editor; it wins over the deduced day, which is kept in `deduced`. */
+  manual: boolean;
+  /** For a manual day, what the calendar deduction says (null when it never ran for that date). */
+  deduced: DayCore | null;
+};
+
+/** What the schedule editor saves for a day; its times count as written out, so the day always has a total. */
+export type ManualDay = { working: boolean; blocks: { start: string; end: string; label: string }[]; note: string };
+
 /** Bump when the prompt or schema changes so cached days are re-deduced. */
-const PROMPT_VERSION = 1;
+const PROMPT_VERSION = 2;
 const BASES: Basis[] = ["stated", "event", "assumed"];
 const CONFIDENCE = ["high", "medium", "low"] as const;
 
@@ -52,6 +63,13 @@ function ensureSchema(): Promise<void> {
       created_at timestamptz NOT NULL DEFAULT now()
     )`;
     await sql`ALTER TABLE schedule_days ADD COLUMN IF NOT EXISTS model text NOT NULL DEFAULT ''`;
+    await sql`CREATE TABLE IF NOT EXISTS schedule_manual (
+      date date PRIMARY KEY,
+      working boolean NOT NULL,
+      blocks jsonb NOT NULL,
+      note text NOT NULL DEFAULT '',
+      updated_at timestamptz NOT NULL DEFAULT now()
+    )`;
   })().catch((e) => {
     schemaReady = null;
     throw e;
@@ -59,7 +77,7 @@ function ensureSchema(): Promise<void> {
   return schemaReady;
 }
 
-type Stored = ScheduleDay & { input_hash: string };
+type Stored = DayCore & { input_hash: string };
 
 async function readDays(from: string, to: string): Promise<Stored[]> {
   await ensureSchema();
@@ -71,7 +89,7 @@ async function readDays(from: string, to: string): Promise<Stored[]> {
     working: r.working as boolean,
     blocks: r.blocks as Block[],
     total_minutes: r.total_minutes == null ? null : Number(r.total_minutes),
-    confidence: r.confidence as ScheduleDay["confidence"],
+    confidence: r.confidence as DayCore["confidence"],
     explanation: r.explanation as string,
     created_at: r.created_at as string,
     input_hash: r.input_hash as string,
@@ -79,9 +97,64 @@ async function readDays(from: string, to: string): Promise<Stored[]> {
   }));
 }
 
-/** Deduced days between from and to (inclusive), without the cache bookkeeping. */
+async function readManual(from: string, to: string): Promise<DayCore[]> {
+  await ensureSchema();
+  const rows = await sql`SELECT date::text AS date, working, blocks, note,
+    to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS updated_at
+    FROM schedule_manual WHERE date BETWEEN ${from} AND ${to} ORDER BY date`;
+  return rows.map((r) => {
+    const blocks = r.blocks as Block[];
+    return {
+      date: r.date as string,
+      working: r.working as boolean,
+      blocks,
+      total_minutes: r.working ? blocks.reduce((n, b) => n + toMinutes(b.end)! - toMinutes(b.start)!, 0) : 0,
+      confidence: "high" as const,
+      explanation: r.note as string,
+      created_at: r.updated_at as string,
+      model: "",
+    };
+  });
+}
+
+/** The schedule between from and to (inclusive): hand-entered days where there are any, deduced days otherwise. */
 export async function getScheduleDays(from: string, to: string): Promise<ScheduleDay[]> {
-  return (await readDays(from, to)).map(({ input_hash: _, ...d }) => d);
+  const [deduced, manual] = await Promise.all([readDays(from, to), readManual(from, to)]);
+  const core = new Map<string, DayCore>(deduced.map(({ input_hash: _, ...d }) => [d.date, d]));
+  const byDate = new Map<string, ScheduleDay>([...core].map(([date, d]) => [date, { ...d, manual: false, deduced: null }]));
+  for (const m of manual) byDate.set(m.date, { ...m, manual: true, deduced: core.get(m.date) ?? null });
+  return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/**
+ * Saves a hand-entered day: times must be HH:MM with each block ending after it starts and
+ * blocks not overlapping. Returns an error message instead when they don't.
+ */
+export async function saveManualDay(date: string, day: ManualDay): Promise<string | null> {
+  const blocks: (Block & { s: number; e: number })[] = [];
+  for (const b of day.working ? day.blocks : []) {
+    const s = toMinutes(String(b.start ?? ""));
+    const e = toMinutes(String(b.end ?? ""));
+    if (s === null || e === null) return "Each block needs a start and end time";
+    if (e <= s) return "Each block has to end after it starts";
+    blocks.push({ s, e, start: fromMinutes(s), end: fromMinutes(e), label: String(b.label ?? "").trim().slice(0, 60), start_basis: "stated", end_basis: "stated", sources: [] });
+  }
+  blocks.sort((a, b) => a.s - b.s);
+  if (blocks.some((b, i) => i > 0 && b.s < blocks[i - 1].e)) return "Blocks can’t overlap";
+  const working = day.working && blocks.length > 0;
+  if (day.working && !working) return "Add at least one block, or untick Working";
+  await ensureSchema();
+  const out = blocks.map(({ s: _s, e: _e, ...b }) => b);
+  await sql`INSERT INTO schedule_manual (date, working, blocks, note, updated_at)
+    VALUES (${date}, ${working}, ${JSON.stringify(out)}::jsonb, ${String(day.note ?? "").slice(0, 500)}, now())
+    ON CONFLICT (date) DO UPDATE SET working = EXCLUDED.working, blocks = EXCLUDED.blocks, note = EXCLUDED.note, updated_at = now()`;
+  return null;
+}
+
+/** Drops a hand-entered day, so the deduced one (if any) shows again. */
+export async function clearManualDay(date: string): Promise<void> {
+  await ensureSchema();
+  await sql`DELETE FROM schedule_manual WHERE date = ${date}`;
 }
 
 /* ---------- input ---------- */
@@ -123,6 +196,7 @@ How to read the calendar:
 - Entries are written by busy people and are imperfect. Working times are often typed into a title rather than set as the event's time (for example "AS 8-5:30", "7:30-12, 3-6", "Anat til 6"), am/pm is usually left out, and there are abbreviations and typos. Read times the way a person in the household would: working hours are daytime, so "8-5:30" means 08:00-17:30 and "7:30-12, 3-6" means 07:30-12:00 and 15:00-18:00.
 - A day can have several separate blocks (a split shift). Never fill a gap the calendar leaves open.
 - Tell statements of the nanny's working time apart from other events (school drop-off or pickup, bedtime, appointments, activities). Those other events can bound working time, e.g. "until pickup" ends a block at the pickup time.
+- Bedtime is 8pm (20:00). When a block ends at bedtime ("til bedtime", "through bedtime") and no bedtime event gives another time, end it at 20:00 with end_basis "event".
 - Days off, vacation, sick days, holidays, or "no nanny" mean no work that day; mention which in the explanation.
 - When a target date has nothing that indicates work, the nanny is not working that day. Use patterns from the other weeks only to resolve what is ambiguous on a date that does have an entry, such as a missing end time.
 - Logged hours are daily totals from the timesheet, not times of day. Use them to check how written schedules usually translate into hours.
@@ -174,7 +248,7 @@ const OUTPUT_SCHEMA = {
 };
 
 type RawBlock = { start: string; end: string; label: string; start_basis: Basis; end_basis: Basis; event_ids: number[] };
-type RawDay = { date: string; working: boolean; blocks: RawBlock[]; confidence: ScheduleDay["confidence"]; explanation: string };
+type RawDay = { date: string; working: boolean; blocks: RawBlock[]; confidence: DayCore["confidence"]; explanation: string };
 
 const toMinutes = (t: string) => {
   const m = /^(\d{1,2}):(\d{2})$/.exec(t.trim());
@@ -186,7 +260,7 @@ const fromMinutes = (v: number) => `${String(Math.floor(v / 60)).padStart(2, "0"
 const weaker = (a: Basis, b: Basis): Basis => (BASES.indexOf(a) > BASES.indexOf(b) ? a : b);
 
 /** Checks the model's blocks: valid times, start before end, sorted, overlaps merged. */
-function cleanDay(raw: RawDay, titles: Map<number, string>): Omit<ScheduleDay, "created_at" | "model"> {
+function cleanDay(raw: RawDay, titles: Map<number, string>): Omit<DayCore, "created_at" | "model"> {
   const blocks: (Block & { s: number; e: number })[] = [];
   for (const b of raw.blocks ?? []) {
     const s = toMinutes(b.start);
@@ -266,7 +340,7 @@ export async function deduceSchedule(start: string, force: boolean): Promise<Ded
   const hashes = new Map(targets.map((d) => [d, dayHash(d, events, settings.scheduleHints, modelTag)]));
   const storedByDate = new Map(stored.map((d) => [d.date, d]));
   if (!force && targets.every((d) => storedByDate.get(d)?.input_hash === hashes.get(d))) {
-    return { days: stored.map(({ input_hash: _, ...d }) => d), cached: true };
+    return { days: await getScheduleDays(start, end), cached: true };
   }
 
   const dates = Array.from({ length: 21 }, (_, i) => addDays(from, i));
@@ -290,7 +364,7 @@ export async function deduceSchedule(start: string, force: boolean): Promise<Ded
   const raw = await askClaude(input, settings.scheduleModel, settings.scheduleEffort);
   const titles = new Map(events.map((e) => [e.id, e.title]));
   const byDate = new Map(raw.filter((d) => hashes.has(d.date)).map((d) => [d.date, cleanDay(d, titles)]));
-  const days: Omit<ScheduleDay, "created_at" | "model">[] = targets.map(
+  const days: Omit<DayCore, "created_at" | "model">[] = targets.map(
     (date) =>
       byDate.get(date) ?? { date, working: false, blocks: [], total_minutes: 0, confidence: "low" as const, explanation: "No answer was returned for this day." },
   );
@@ -306,11 +380,9 @@ export async function deduceSchedule(start: string, force: boolean): Promise<Ded
   return { days: await getScheduleDays(start, end), cached: false };
 }
 
-/** Sets a day's working hours to its scheduled total; other timesheet fields are kept. */
+/** Sets a day's working hours to its scheduled total (hand-entered or deduced); other timesheet fields are kept. */
 export async function applyScheduledHours(date: string): Promise<{ ok: boolean; error?: string }> {
-  await ensureSchema();
-  const rows = await sql`SELECT total_minutes FROM schedule_days WHERE date = ${date}`;
-  const total = rows[0]?.total_minutes;
+  const total = (await getScheduleDays(date, date))[0]?.total_minutes;
   if (total == null) return { ok: false, error: "no scheduled total for this day" };
   const minutes = Math.min(Number(total), 99 * 60 + 59);
   await sql`INSERT INTO days (date, hours, minutes) VALUES (${date}, ${Math.floor(minutes / 60)}, ${minutes % 60})
