@@ -15,9 +15,9 @@ await sql`CREATE TABLE IF NOT EXISTS days (
 )`;
 await sql`CREATE TABLE IF NOT EXISTS payments (
   period_start date PRIMARY KEY,
-  homepay_earnings numeric(10,2),
-  homepay_net numeric(10,2),
-  homepay_date date,
+  regular_due numeric(10,2),
+  regular_paid numeric(10,2),
+  regular_date date,
   personal_paid numeric(10,2),
   personal_date date,
   route text,
@@ -35,13 +35,24 @@ if (valueType[0]?.data_type === "numeric") {
 }
 await sql`ALTER TABLE settings ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now()`;
 
+// Homepay earnings / net / date became regular due / paid / date, matching personal due / paid.
+// Older databases get the new columns, one last copy of the legacy homepay_* values, then lose the legacy columns.
+await sql`ALTER TABLE payments ADD COLUMN IF NOT EXISTS regular_due numeric(10,2)`;
+await sql`ALTER TABLE payments ADD COLUMN IF NOT EXISTS regular_paid numeric(10,2)`;
+await sql`ALTER TABLE payments ADD COLUMN IF NOT EXISTS regular_date date`;
+const hadHomepay = await sql`SELECT 1 FROM information_schema.columns WHERE table_name = 'payments' AND column_name = 'homepay_net'`;
+if (hadHomepay.length) {
+  await sql`UPDATE payments SET regular_due = homepay_earnings, regular_paid = homepay_net, regular_date = homepay_date`;
+  await sql`ALTER TABLE payments DROP COLUMN homepay_earnings, DROP COLUMN homepay_net, DROP COLUMN homepay_date`;
+}
+
 // Payment approval: a checkbox plus the server time of its last change (an audit trail of the last click).
 const hadApproval = await sql`SELECT 1 FROM information_schema.columns WHERE table_name = 'payments' AND column_name = 'approved'`;
 if (!hadApproval.length) {
   await sql`ALTER TABLE payments ADD COLUMN approved boolean NOT NULL DEFAULT false`;
   await sql`ALTER TABLE payments ADD COLUMN approved_at timestamptz`;
-  // History predates the checkbox: anything with homepay already recorded counts as approved (approved_at stays null = "imported").
-  await sql`UPDATE payments SET approved = true WHERE homepay_net IS NOT NULL`;
+  // History predates the checkbox: anything with a regular payment already recorded counts as approved (approved_at stays null = "imported").
+  await sql`UPDATE payments SET approved = true WHERE regular_paid IS NOT NULL`;
 }
 
 // Calendars are a list with their own lifecycle, so they get tables instead of settings keys.
@@ -95,14 +106,6 @@ await sql`UPDATE days SET vac_h = (round(vacation * 60)::int) / 60, vac_m = (rou
 await sql`UPDATE days SET sick_h = (round(sick * 60)::int) / 60, sick_m = (round(sick * 60)::int) % 60
   WHERE sick > 0 AND sick_h = 0 AND sick_m = 0`;
 await sql`UPDATE days SET hol_h = 8 WHERE holiday AND hol_h = 0 AND hol_m = 0`;
-
-// Homepay earnings / net / date become regular due / paid / date, matching personal due / paid.
-// The legacy homepay_* columns stay and are kept in sync by the app so the previous release keeps
-// working until this one is merged; the copy below catches up anything that release wrote meanwhile.
-await sql`ALTER TABLE payments ADD COLUMN IF NOT EXISTS regular_due numeric(10,2)`;
-await sql`ALTER TABLE payments ADD COLUMN IF NOT EXISTS regular_paid numeric(10,2)`;
-await sql`ALTER TABLE payments ADD COLUMN IF NOT EXISTS regular_date date`;
-await sql`UPDATE payments SET regular_due = homepay_earnings, regular_paid = homepay_net, regular_date = homepay_date`;
 
 await sql`INSERT INTO settings (key, value) VALUES ('ot_rate', '28'), ('ot_threshold', '40'), ('venmo_handle', '"anat-sweeney"') ON CONFLICT (key) DO NOTHING`;
 

@@ -86,15 +86,13 @@ for (const d of days) {
       notes = EXCLUDED.notes`;
 }
 for (const p of payments.values()) {
-  // legacy homepay_* columns are kept in sync for the previous release
   const due = p.regular_due as number | null, paid = p.regular_paid as number | null, date = p.regular_date as string | null;
-  await sql`INSERT INTO payments (period_start, regular_due, regular_paid, regular_date, homepay_earnings, homepay_net, homepay_date,
+  await sql`INSERT INTO payments (period_start, regular_due, regular_paid, regular_date,
       personal_paid, personal_date, route, notes)
-    VALUES (${p.period_start as string}, ${due}, ${paid}, ${date}, ${due}, ${paid}, ${date},
+    VALUES (${p.period_start as string}, ${due}, ${paid}, ${date},
       ${p.personal_paid as number | null}, ${p.personal_date as string | null}, ${p.route as string | null}, ${p.notes as string | null})
     ON CONFLICT (period_start) DO UPDATE SET regular_due = EXCLUDED.regular_due, regular_paid = EXCLUDED.regular_paid,
-      regular_date = EXCLUDED.regular_date, homepay_earnings = EXCLUDED.homepay_earnings, homepay_net = EXCLUDED.homepay_net,
-      homepay_date = EXCLUDED.homepay_date, personal_paid = EXCLUDED.personal_paid, personal_date = EXCLUDED.personal_date,
+      regular_date = EXCLUDED.regular_date, personal_paid = EXCLUDED.personal_paid, personal_date = EXCLUDED.personal_date,
       route = EXCLUDED.route, notes = EXCLUDED.notes`;
 }
 console.log(`imported ${days.length} days, ${payments.size} payment rows`);
