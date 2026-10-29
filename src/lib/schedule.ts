@@ -39,7 +39,7 @@ export type ScheduleDay = DayCore & {
 export type ManualDay = { working: boolean; blocks: { start: string; end: string; label: string }[]; note: string };
 
 /** Bump when the prompt or schema changes so cached days are re-deduced. */
-const PROMPT_VERSION = 2;
+const PROMPT_VERSION = 3;
 const BASES: Basis[] = ["stated", "event", "assumed"];
 const CONFIDENCE = ["high", "medium", "low"] as const;
 
@@ -196,7 +196,7 @@ How to read the calendar:
 - Entries are written by busy people and are imperfect. Working times are often typed into a title rather than set as the event's time (for example "AS 8-5:30", "7:30-12, 3-6", "Anat til 6"), am/pm is usually left out, and there are abbreviations and typos. Read times the way a person in the household would: working hours are daytime, so "8-5:30" means 08:00-17:30 and "7:30-12, 3-6" means 07:30-12:00 and 15:00-18:00.
 - A day can have several separate blocks (a split shift). Never fill a gap the calendar leaves open.
 - Tell statements of the nanny's working time apart from other events (school drop-off or pickup, bedtime, appointments, activities). Those other events can bound working time, e.g. "until pickup" ends a block at the pickup time.
-- Bedtime is 8pm (20:00). When a block ends at bedtime ("til bedtime", "through bedtime") and no bedtime event gives another time, end it at 20:00 with end_basis "event".
+- Bedtime is 8pm (20:00). When the nanny's written hours end at bedtime (e.g. "AS 7:30-11, 4-Bedtime", "til bedtime"), end that block at 20:00 with end_basis "stated", since bedtime is a known time. Only when a block's end is taken from a separate bedtime event, use that event's time with end_basis "event".
 - Days off, vacation, sick days, holidays, or "no nanny" mean no work that day; mention which in the explanation.
 - When a target date has nothing that indicates work, the nanny is not working that day. Use patterns from the other weeks only to resolve what is ambiguous on a date that does have an entry, such as a missing end time.
 - Logged hours are daily totals from the timesheet, not times of day. Use them to check how written schedules usually translate into hours.
